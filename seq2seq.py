@@ -13,15 +13,15 @@ class seq2seq(torch.nn.Module):
         trg_emb_dim=100,
         src_hidden_dim=25,
         trg_hidden_dim=50,
-        src_vocab_size=2000,
-        trg_vocab_size=2000,
+        src_vocab_size=999,
+        trg_vocab_size=999,
         src_pad_token=0,
         trg_pad_token=0,
         src_nlayer=2,
         trg_nlayer=1,
         src_bidirect=True,
         batch_size=128,
-        dropout=0.
+        dropout=0.0
     ):
         super(seq2seq, self).__init__()
         
@@ -38,13 +38,13 @@ class seq2seq(torch.nn.Module):
             src_vocab_size,
             src_emb_dim,
             padding_idx=0
-        )
+        ).cuda()
         
         self.trg_embedding = torch.nn.Embedding(
             trg_vocab_size,
             trg_emb_dim,
             padding_idx=0
-        )
+        ).cuda()
         
         self.encoder = torch.nn.LSTM(
             input_size=src_emb_dim,
@@ -53,7 +53,7 @@ class seq2seq(torch.nn.Module):
             bidirectional=src_bidirect,
             batch_first=True,
             dropout=dropout
-        )
+        ).cuda()
         
         self.decoder = torch.nn.LSTM(
             input_size=trg_emb_dim,
@@ -61,17 +61,17 @@ class seq2seq(torch.nn.Module):
             num_layers=trg_nlayer,
             batch_first=True,
             dropout=dropout
-        )
+        ).cuda()
         
         self.src2trg = torch.nn.Linear(
             src_hidden_dim*self.n_directions,
             trg_hidden_dim
-        )
+        ).cuda()
         
         self.trg2vocab = torch.nn.Linear(
             trg_hidden_dim,
             trg_vocab_size
-        )
+        ).cuda()
         
         # init weights
         torch.nn.init.normal(self.src_embedding.weight, mean=0.0, std=0.02)
@@ -92,14 +92,14 @@ class seq2seq(torch.nn.Module):
             self.encoder.num_layers*self.n_directions,
             batch_size,
             self.src_hidden_dim
-        ))
+        )).cuda()
         
         src_c_0 = Variable(torch.zeros(
             self.encoder.num_layers*self.n_directions,
             batch_size,
             self.src_hidden_dim
-        ))
-        
+        )).cuda()
+                
         src_h, (src_h_t, src_c_t) = self.encoder(
             src_emb,
             (src_h_0, src_c_0)
