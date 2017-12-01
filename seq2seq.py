@@ -83,6 +83,7 @@ class seq2seq(torch.nn.Module):
         # init state
         src_emb = self.src_embedding(input_src)
         trg_emb = self.trg_embedding(input_trg)
+        print trg_emb.view(-1).size()
         
         batch_size = input_src.size(1)
         if self.encoder.batch_first:
@@ -136,14 +137,14 @@ class seq2seq(torch.nn.Module):
             trg_h.size(2)
         )
         
-        decoder_logits = self.trg2vocab(trg_h_reshape)
-        decoder_logits = decoder_logits.view(
+        decoder_output = self.trg2vocab(trg_h_reshape)
+        decoder_output = decoder_output.view(
             trg_h.size(0),
             trg_h.size(1),
-            decoder_logits.size(1)
+            decoder_output.size(1)
         )
         
-        return decoder_logits
+        return decoder_output
     
     def decode(self, logits):
         logits_reshape = logits.view(-1, self.trg_vocab_size)
