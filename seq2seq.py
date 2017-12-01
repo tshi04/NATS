@@ -48,7 +48,7 @@ class seq2seq(torch.nn.Module):
         
         self.encoder = torch.nn.LSTM(
             input_size=src_emb_dim,
-            hidden_size=self.src_hidden_dim,
+            hidden_size=src_hidden_dim,
             num_layers=src_nlayer,
             bidirectional=src_bidirect,
             batch_first=True,
@@ -83,7 +83,6 @@ class seq2seq(torch.nn.Module):
         # init state
         src_emb = self.src_embedding(input_src)
         trg_emb = self.trg_embedding(input_trg)
-        print trg_emb.view(-1).size()
         
         batch_size = input_src.size(1)
         if self.encoder.batch_first:
@@ -136,7 +135,7 @@ class seq2seq(torch.nn.Module):
             trg_h.size(0)*trg_h.size(1),
             trg_h.size(2)
         )
-        
+                
         decoder_output = self.trg2vocab(trg_h_reshape)
         decoder_output = decoder_output.view(
             trg_h.size(0),
