@@ -47,7 +47,7 @@ loss_criterion = torch.nn.CrossEntropyLoss(weight=weight_mask).cuda()
 
 optimizer = torch.optim.Adam(model.parameters())
 
-out_dir = 'results'
+out_dir = data_dir+'/lstm2lstm_results'
 if os.path.exists(out_dir):
     shutil.rmtree(out_dir)
 os.mkdir(out_dir)
