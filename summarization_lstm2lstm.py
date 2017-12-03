@@ -6,13 +6,13 @@ import os
 import torch
 from torch.autograd import Variable
 
-from seq2seq import *
+from lstm2lstm import *
 from data_utils import *
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--model', default='seq2seq', help='seq2seq | seqGAN')
-stc = parser.parse_args()
+#parser = argparse.ArgumentParser()
+#parser.add_argument('--model', default='seq2seq', help='seq2seq | seqGAN')
+#stc = parser.parse_args()
 
 data_dir = '../sum_data/'
 file_vocab = 'cnn_vocab.txt'
