@@ -9,6 +9,7 @@ from torch.autograd import Variable
 from seq2seq import *
 from data_utils import *
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', default='seq2seq', help='seq2seq | seqGAN')
 stc = parser.parse_args()

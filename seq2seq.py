@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 
+
 class seq2seq(torch.nn.Module):
     '''
     LSTM encoder
@@ -79,6 +80,7 @@ class seq2seq(torch.nn.Module):
         torch.nn.init.constant(self.src2trg.bias, 0.0)
         torch.nn.init.constant(self.trg2vocab.bias, 0.0)
         
+
     def forward(self, input_src, input_trg):
         # init state
         src_emb = self.src_embedding(input_src)
@@ -145,6 +147,7 @@ class seq2seq(torch.nn.Module):
         
         return decoder_output
     
+
     def decode(self, logits):
         logits_reshape = logits.view(-1, self.trg_vocab_size)
         word_probs = torch.nn.functional.softmax(logits_reshape)
