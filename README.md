@@ -1,1 +1,1 @@
-# TextGen
+# Text summarization
