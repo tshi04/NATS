@@ -11,7 +11,7 @@ class seq2seq(torch.nn.Module):
         self,
         src_emb_dim=100,
         trg_emb_dim=100,
-        src_hidden_dim=25,
+        src_hidden_dim=50,
         trg_hidden_dim=50,
         src_vocab_size=999,
         trg_vocab_size=999,
@@ -29,10 +29,10 @@ class seq2seq(torch.nn.Module):
         self.trg_vocab_size = trg_vocab_size
 
         self.n_directions = 1
-        self.src_hidden_dim = src_hidden_dim//2
+        self.src_hidden_dim = src_hidden_dim
         if src_bidirect:
             self.n_directions = 2
-            self.src_hidden_dim = src_hidden_dim
+            self.src_hidden_dim = src_hidden_dim // 2
         
         self.src_embedding = torch.nn.Embedding(
             src_vocab_size,
@@ -48,7 +48,7 @@ class seq2seq(torch.nn.Module):
         
         self.encoder = torch.nn.LSTM(
             input_size=src_emb_dim,
-            hidden_size=src_hidden_dim,
+            hidden_size=self.src_hidden_dim,
             num_layers=src_nlayer,
             bidirectional=src_bidirect,
             batch_first=True,
@@ -64,7 +64,7 @@ class seq2seq(torch.nn.Module):
         ).cuda()
         
         self.src2trg = torch.nn.Linear(
-            src_hidden_dim*self.n_directions,
+            self.src_hidden_dim*self.n_directions,
             trg_hidden_dim
         ).cuda()
         

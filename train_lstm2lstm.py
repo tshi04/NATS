@@ -29,7 +29,7 @@ print 'The number of batches: {0}'.format(n_batch)
 model = seq2seq(
     src_emb_dim=100,
     trg_emb_dim=100,
-    src_hidden_dim=25,
+    src_hidden_dim=50,
     trg_hidden_dim=50,
     src_vocab_size=len(vocab2id),
     trg_vocab_size=len(vocab2id),
@@ -41,6 +41,7 @@ model = seq2seq(
     batch_size=batch_size,
     dropout=0.0
 ).cuda()
+print model
 
 weight_mask = torch.ones(len(vocab2id)).cuda()
 weight_mask[vocab2id['<pad>']] = 0

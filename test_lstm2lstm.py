@@ -37,14 +37,25 @@ model = seq2seq(
     dropout=0.0
 ).cuda()
 
-model.load_state_dict(torch.load('../sum_data/lstm2lstm_results/lstm2lstm_19_1400.model'))
+model.load_state_dict(torch.load('../sum_data/lstm2lstm_results/lstm2lstm_15_1400.model'))
 
 src_var, trg_input_var, trg_output_var = process_minibatch(
     100, vocab2id, max_lens=[512, 64]
 )
-logits = model(src_var.cuda(), trg_input_var.cuda())
-word_prob = model.decode(logits).data.cpu().numpy().argmax(axis=-1)
-sen_pred = [id2vocab[x] for x in word_prob[0]]
+
+trg_input_arr = [[vocab2id['<s>'] for k in range(64)] for j in range(batch_size)]
+trg_input_var = Variable(torch.LongTensor(trg_input_arr))
+for k in range(64):
+    print k,
+    logits = model(src_var.cuda(), trg_input_var.cuda())
+    word_prob = model.decode(logits).data.cpu().numpy().argmax(axis=-1)
+    for j in range(64):
+        trg_input_arr[j][k] = word_prob[j][k]
+        trg_input_var = Variable(torch.LongTensor(trg_input_arr))
+print
+
+idid = 32
+sen_pred = [id2vocab[x] for x in word_prob[idid]]
 print ''.join(['-' for k in range(50)])
 st_idx = len(sen_pred)
 for k, wd in enumerate(sen_pred):
@@ -55,7 +66,7 @@ sen_pred = sen_pred[:st_idx]
 print ' '.join(sen_pred)
 
 print ''.join(['-' for k in range(50)])
-sen_abs = [id2vocab[x] for x in trg_output_var.data[0]]
+sen_abs = [id2vocab[x] for x in trg_output_var.data[idid]]
 st_idx = len(sen_abs)
 for k, wd in enumerate(sen_abs):
     if wd == '<pad>':
@@ -64,7 +75,7 @@ for k, wd in enumerate(sen_abs):
 print ' '.join(sen_abs[:st_idx])
 
 print ''.join(['-' for k in range(50)])
-sen_source = [id2vocab[x] for x in src_var.data[0]]
+sen_source = [id2vocab[x] for x in src_var.data[idid]]
 st_idx = len(sen_source)
 for k, wd in enumerate(sen_source):
     if wd == '<pad>':
