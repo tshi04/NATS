@@ -6,7 +6,7 @@ import os
 import torch
 from torch.autograd import Variable
 
-from lstm2lstm import *
+from lstm2lstmAttention import *
 from data_utils import *
 
 data_dir = '../sum_data/'
@@ -21,7 +21,7 @@ print 'The vocabulary size: {0}'.format(len(vocab2id))
 n_batch = create_batch_file(file_name='../sum_data/cnn.txt', batch_size=batch_size)
 print 'The number of batches: {0}'.format(n_batch)
 
-model = seq2seq(
+model = seq2seqAttention(
     src_emb_dim=100,
     trg_emb_dim=100,
     src_hidden_dim=50,
@@ -37,31 +37,31 @@ model = seq2seq(
     dropout=0.0
 ).cuda()
 
-model.load_state_dict(torch.load('../sum_data/lstm2lstm_results/lstm2lstm_30_1000.model'))
+model.load_state_dict(torch.load('../sum_data/lstm2lstmAttn_results/lstm2lstm_80_0.model'))
 
 src_var, trg_input_var, trg_output_var = process_minibatch(
-    100, vocab2id, max_lens=[256, 24]
+    300, vocab2id, max_lens=[256, 24]
 )
+
 
 trg_input_arr = [[vocab2id['<s>'] for k in range(24)] for j in range(batch_size)]
 trg_input_var = Variable(torch.LongTensor(trg_input_arr))
 for k in range(24):
-    print k,
+    print k
     logits = model(src_var.cuda(), trg_input_var.cuda())
     word_prob = model.decode(logits).data.cpu().numpy().argmax(axis=-1)
     for j in range(64):
         trg_input_arr[j][k] = word_prob[j][k]
         trg_input_var = Variable(torch.LongTensor(trg_input_arr))
-print
 
-idid = 32
+idid = 0
 sen_pred = [id2vocab[x] for x in word_prob[idid]]
 print ''.join(['-' for k in range(50)])
 st_idx = len(sen_pred)
 for k, wd in enumerate(sen_pred):
     if wd == '</s>':
-        st_idx = k
-        break
+	st_idx = k
+	break
 sen_pred = sen_pred[:st_idx]
 print ' '.join(sen_pred)
 
@@ -70,8 +70,8 @@ sen_abs = [id2vocab[x] for x in trg_output_var.data[idid]]
 st_idx = len(sen_abs)
 for k, wd in enumerate(sen_abs):
     if wd == '<pad>':
-        st_idx = k
-        break
+	st_idx = k
+	break
 print ' '.join(sen_abs[:st_idx])
 
 print ''.join(['-' for k in range(50)])
@@ -79,6 +79,6 @@ sen_source = [id2vocab[x] for x in src_var.data[idid]]
 st_idx = len(sen_source)
 for k, wd in enumerate(sen_source):
     if wd == '<pad>':
-        st_idx = k
-        break
+	st_idx = k
+	break
 print ' '.join(sen_source[:st_idx])

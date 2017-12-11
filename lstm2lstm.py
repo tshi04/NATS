@@ -34,15 +34,9 @@ class seq2seq(torch.nn.Module):
             self.n_directions = 2
             self.src_hidden_dim = src_hidden_dim // 2
         
-        self.src_embedding = torch.nn.Embedding(
+        self.embedding = torch.nn.Embedding(
             src_vocab_size,
             src_emb_dim,
-            padding_idx=0
-        ).cuda()
-        
-        self.trg_embedding = torch.nn.Embedding(
-            trg_vocab_size,
-            trg_emb_dim,
             padding_idx=0
         ).cuda()
         
@@ -74,16 +68,15 @@ class seq2seq(torch.nn.Module):
         ).cuda()
         
         # init weights
-        torch.nn.init.normal(self.src_embedding.weight, mean=0.0, std=0.02)
-        torch.nn.init.normal(self.trg_embedding.weight, mean=0.0, std=0.02)
+        torch.nn.init.uniform(self.embedding.weight, -1, 1)
         torch.nn.init.constant(self.src2trg.bias, 0.0)
         torch.nn.init.constant(self.trg2vocab.bias, 0.0)
         
 
     def forward(self, input_src, input_trg):
         # init state
-        src_emb = self.src_embedding(input_src)
-        trg_emb = self.trg_embedding(input_trg)
+        src_emb = self.embedding(input_src)
+        trg_emb = self.embedding(input_trg)
         
         batch_size = input_src.size(1)
         if self.encoder.batch_first:

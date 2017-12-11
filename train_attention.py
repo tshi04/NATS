@@ -1,18 +1,17 @@
-import argparse
-import shutil
 import re
 import os
+import argparse
+import shutil
 
 import torch
 from torch.autograd import Variable
 
-from lstm2lstm import *
+from lstm2lstmBAttn import *
 from data_utils import *
 
-
-#parser = argparse.ArgumentParser()
-#parser.add_argument('--model', default='seq2seq', help='seq2seq | seqGAN')
-#stc = parser.parse_args()
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', default='lstm2lstm', help='lstm2lstm | ')
+stc = parser.parse_args()
 
 data_dir = '../sum_data/'
 file_vocab = 'cnn_vocab.txt'
@@ -26,7 +25,7 @@ print 'The vocabulary size: {0}'.format(len(vocab2id))
 n_batch = create_batch_file(file_name='../sum_data/cnn.txt', batch_size=batch_size)
 print 'The number of batches: {0}'.format(n_batch)
 
-model = seq2seq(
+model = seq2seqAttention(
     src_emb_dim=100,
     trg_emb_dim=100,
     src_hidden_dim=50,
@@ -49,7 +48,7 @@ loss_criterion = torch.nn.CrossEntropyLoss(weight=weight_mask).cuda()
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
-out_dir = data_dir+'/lstm2lstm_results'
+out_dir = data_dir+'/lstm2lstmAttn_results'
 if os.path.exists(out_dir):
     shutil.rmtree(out_dir)
 os.mkdir(out_dir)
