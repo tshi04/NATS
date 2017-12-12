@@ -3,10 +3,8 @@ import re
 import shutil
 import numpy as np
 
-
 import torch
 from torch.autograd import Variable
-
 
 def construct_vocab(file_, mincount=10):
     vocab2id = {
@@ -33,7 +31,6 @@ def construct_vocab(file_, mincount=10):
     
     return vocab2id, id2vocab
 
-
 def create_batch_file(file_name, batch_size):
     folder = 'batch_folder'
     fkey = 'batch_'
@@ -58,7 +55,6 @@ def create_batch_file(file_name, batch_size):
     fp.close()
     
     return cnt
-
 
 def process_minibatch(batch_id, vocab2id, max_lens=[512, 64]):
     
@@ -118,7 +114,4 @@ def process_minibatch(batch_id, vocab2id, max_lens=[512, 64]):
     trg_output_var = Variable(torch.LongTensor(trg_output_arr))
     
     return src_var, trg_input_var, trg_output_var
-
-
-
 

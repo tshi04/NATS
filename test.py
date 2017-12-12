@@ -35,7 +35,7 @@ opt = parser.parse_args()
 vocab2id, id2vocab = construct_vocab(opt.data_dir+'/'+opt.file_vocab)
 print 'The vocabulary size: {0}'.format(len(vocab2id))
 
-if os.path.exists('batch_folder'):
+if not os.path.exists('batch_folder'):
     n_batch = create_batch_file(
         file_name=opt.data_dir+'/'+opt.file_corpus, 
         batch_size=opt.batch_size
