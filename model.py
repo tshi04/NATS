@@ -275,8 +275,6 @@ class Seq2Seq(torch.nn.Module):
         trg_hidden_dim=50,
         src_vocab_size=999,
         trg_vocab_size=999,
-        src_pad_token=0,
-        trg_pad_token=0,
         src_nlayer=1,
         trg_nlayer=1,
         batch_first=True,

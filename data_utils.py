@@ -99,10 +99,6 @@ def process_minibatch(batch_id, vocab2id, max_lens=[512, 64]):
     
     src_arr = [itm[:max_lens[0]] for itm in src_arr]
     trg_arr = [itm[:max_lens[1]] for itm in trg_arr]
-    
-    #src_lens = [len(itm) for itm in src_arr]
-    #trg_lens = [len(itm) for itm in trg_arr]
-    #max_lens = [max(src_lens), max(trg_lens)]
 
     src_arr = [
         itm[:-1] + [vocab2id['<pad>']]*(1+max_lens[0]-len(itm))
