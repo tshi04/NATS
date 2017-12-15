@@ -76,7 +76,7 @@ for epoch in range(opt.n_epoch):
         src_var, trg_input_var, trg_output_var = process_minibatch(
             batch_id, vocab2id, max_lens=[opt.src_max_lens, opt.trg_max_lens]
         )
-        logits = model(src_var.cuda(), trg_input_var.cuda())
+        logits, _ = model(src_var.cuda(), trg_input_var.cuda())
         optimizer.zero_grad()
         
         loss = loss_criterion(

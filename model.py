@@ -119,9 +119,9 @@ class AttentionLuong(torch.nn.Module):
 
         return h_attn, attn
 
-    
-    
-    
+'''
+LSTM decoder
+'''    
 class LSTMDecoder(torch.nn.Module):
     def __init__(
         self,
@@ -207,8 +207,11 @@ class LSTMDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
             
-        return output_, hidden_
+        return output_, hidden_, attn
 
+'''
+GRU decoder
+'''
 class GRUDecoder(torch.nn.Module):
     def __init__(
         self,
@@ -294,7 +297,7 @@ class GRUDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
             
-        return output_, hidden_
+        return output_, hidden_, attn
 
     
 class Seq2Seq(torch.nn.Module):
@@ -383,19 +386,16 @@ class Seq2Seq(torch.nn.Module):
                 batch_first=self.batch_first,
                 attn_method=self.attn_method
             ).cuda()
-            
         # encoder to decoder
         self.encoder2decoder = torch.nn.Linear(
             self.src_hidden_dim*self.src_num_directions,
             self.trg_hidden_dim
         ).cuda()
-        torch.nn.init.constant(self.encoder2decoder.bias, 0.0)
         # decoder to vocab
         self.decoder2vocab = torch.nn.Linear(
             self.trg_hidden_dim,
             self.trg_vocab_size
         ).cuda()
-        torch.nn.init.constant(self.decoder2vocab.bias, 0.0)
         
     def forward(self, input_src, input_trg):
         src_emb = self.embedding(input_src)
@@ -432,7 +432,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, (_, _) = self.decoder(
+            trg_h, (_, _), self.attn_ = self.decoder(
                 trg_emb,
                 (decoder_h0, decoder_c0),
                 encoder_hy
@@ -454,7 +454,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, _ = self.decoder(
+            trg_h, _, self.attn_ = self.decoder(
                 trg_emb,
                 decoder_h0,
                 encoder_hy
@@ -471,12 +471,12 @@ class Seq2Seq(torch.nn.Module):
             trg_h.size(1),
             decoder_output.size(1)
         )
-        
-        return decoder_output
+
+        return decoder_output, self.attn_
     
     def decode(self, logits):
         logits_reshape = logits.view(-1, self.trg_vocab_size)
-        word_probs = F.softmax(logits_reshape)
+        word_probs = self.softmax_(logits_reshape)
         word_probs = word_probs.view(
             logits.size(0), logits.size(1), logits.size(2)
         )

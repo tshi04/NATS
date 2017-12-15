@@ -13,7 +13,7 @@ def beam_search(
     beam_prb = Variable(torch.FloatTensor(beam_size).fill_(0.0))
     src_text_rep = src_text.repeat(beam_size, 1)
     for j in range(max_len-1):
-        logits = model(src_text_rep.cuda(), beam_seq.cuda())
+        logits, _ = model(src_text_rep.cuda(), beam_seq.cuda())
         word_prob = model.decode(logits=logits)
         prob, wds = word_prob.topk(k=beam_size)
         if j == 0:
