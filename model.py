@@ -279,7 +279,6 @@ class Seq2Seq(torch.nn.Module):
         trg_nlayer=1,
         batch_first=True,
         src_bidirect=True,
-        batch_size=128,
         dropout=0.0,
         attn_method='vanilla',
         network_='gru'
@@ -296,7 +295,6 @@ class Seq2Seq(torch.nn.Module):
         self.trg_nlayer = trg_nlayer
         self.batch_first = batch_first
         self.src_bidirect = src_bidirect
-        self.batch_size = batch_size
         self.dropout = dropout
         self.attn_method = attn_method
         self.network_ = network_.lower()
@@ -377,16 +375,12 @@ class Seq2Seq(torch.nn.Module):
 
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
-            self.batch_size,
-            self.src_hidden_dim
-        ), requires_grad=False).cuda()
+            batch_size, self.src_hidden_dim)).cuda()
         
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
                 self.encoder.num_layers*self.src_num_directions,
-                self.batch_size,
-                self.src_hidden_dim
-            ), requires_grad=False).cuda()
+                batch_size, self.src_hidden_dim)).cuda()
 
             src_h, (src_h_t, src_c_t) = self.encoder(
                 src_emb, 

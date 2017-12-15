@@ -9,6 +9,7 @@ from torch.autograd import Variable
 
 from model import *
 from data_utils import *
+from utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='../sum_data/', help='directory that store the data')
@@ -32,86 +33,37 @@ parser.add_argument('--src_max_lens', type=int, default=256)
 parser.add_argument('--trg_max_lens', type=int, default=30)
 opt = parser.parse_args()
 
-vocab2id, id2vocab = construct_vocab(opt.data_dir+'/'+opt.file_vocab)
+model = torch.load('../sum_data/seq2seq_results-1/seq2seq_299_1000.pt').cuda()
+print model
+
+data_dir = '../sum_data/'
+file_vocab = 'cnn_vocab_abs.txt'
+file_corpus = 'cnn_abs.txt'
+batch_size = 64
+
+vocab2id, id2vocab = construct_vocab(data_dir+'/'+file_vocab)
 print 'The vocabulary size: {0}'.format(len(vocab2id))
 
 if not os.path.exists('batch_folder'):
     n_batch = create_batch_file(
-        file_name=opt.data_dir+'/'+opt.file_corpus, 
-        batch_size=opt.batch_size
+        file_name=data_dir+'/'+file_corpus, 
+        batch_size=batch_size
     )
 else:
     n_batch = len(glob.glob('batch_folder/batch_*'))
 print 'The number of batches: {0}'.format(n_batch)
 
-model = Seq2Seq(
-    src_emb_dim=opt.src_emb_dim,
-    trg_emb_dim=opt.trg_emb_dim,
-    src_hidden_dim=opt.src_hidden_dim,
-    trg_hidden_dim=opt.trg_hidden_dim,
-    src_vocab_size=len(vocab2id),
-    trg_vocab_size=len(vocab2id),
-    src_nlayer=opt.src_num_layers,
-    trg_nlayer=opt.trg_num_layers,
-    batch_first=opt.batch_first,
-    src_bidirect=opt.src_bidirection,
-    batch_size=opt.batch_size,
-    dropout=opt.dropout,
-    attn_method=opt.attn_method,
-    network_=opt.network_
-).cuda()
-
-print model
-
-weight_mask = torch.ones(len(vocab2id)).cuda()
-weight_mask[vocab2id['<pad>']] = 0
-loss_criterion = torch.nn.CrossEntropyLoss(weight=weight_mask).cuda()
-
-optimizer = torch.optim.Adam(model.parameters(), lr=opt.learning_rate)
-
-lead_dir = opt.data_dir+'/seq2seq_results-'
-for k in range(1000000):
-    out_dir = lead_dir+str(k)
-    if not os.path.exists(out_dir):
-        break
-os.mkdir(out_dir)
-
-losses = []
-for epoch in range(opt.n_epoch):
-    for batch_id in range(n_batch):
-        src_var, trg_input_var, trg_output_var = process_minibatch(
-            batch_id, vocab2id, max_lens=[opt.src_max_lens, opt.trg_max_lens]
-        )
-        logits = model(src_var.cuda(), trg_input_var.cuda())
-        optimizer.zero_grad()
-        
-        loss = loss_criterion(
-            logits.contiguous().view(-1, len(vocab2id)),
-            trg_output_var.view(-1).cuda()
-        )
-        loss.backward()
-        optimizer.step()
-        
-        losses.append([epoch, batch_id, loss.data.cpu().numpy()[0]])
-        if batch_id % 500 == 0:
-            loss_np = np.array(losses)
-            np.save(out_dir+'/loss', loss_np)
-            
-            print 'epoch={0} batch={1} loss={2}'.format(
-                epoch, batch_id, loss.data.cpu().numpy()[0]
-            )
-            word_prob = model.decode(logits).data.cpu().numpy().argmax(axis=2)
-            sen_pred = [id2vocab[x] for x in word_prob[0]]
-            st_idx = len(sen_pred)
-            for k, wd in enumerate(sen_pred):
-                if wd == '</s>':
-                    st_idx = k
-                    break
-            sen_pred = sen_pred[:st_idx]
-            print ' '.join(sen_pred)
-            torch.save(
-                model,
-                open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
-            )
-            
-            
+src_var, trg_input_var, trg_output_var = process_minibatch(
+    200, vocab2id, max_lens=[100, 20])
+for k in range(batch_size):
+    print
+    print
+    print ' '.join([id2vocab[wd] for wd in src_var[k].data.cpu().numpy()])
+    print
+    print ' '.join([id2vocab[wd] for wd in trg_input_var[k].data.cpu().numpy()])
+    print
+    beam_seq, beam_prb = beam_search(model=model, src_text=src_var[k], vocab2id=vocab2id, max_len=20)
+    gen_text = beam_seq.data.cpu().numpy()[0]
+    gen_text = [id2vocab[wd] for wd in gen_text]
+    print ' '.join(gen_text)
+    print '-'*50

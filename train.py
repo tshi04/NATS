@@ -12,9 +12,9 @@ from data_utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='../sum_data/', help='directory that store the data')
-parser.add_argument('--file_vocab', default='cnn_vocab.txt', help='vocabulary file')
-parser.add_argument('--file_corpus', default='cnn.txt', help='file store documents')
-parser.add_argument('--n_epoch', type=int, default=100, help='number of epochs')
+parser.add_argument('--file_vocab', default='cnn_vocab_abs.txt', help='vocabulary file')
+parser.add_argument('--file_corpus', default='cnn_abs.txt', help='file store documents')
+parser.add_argument('--n_epoch', type=int, default=300, help='number of epochs')
 parser.add_argument('--batch_size', type=int, default=64, help='batch size')
 parser.add_argument('--src_emb_dim', type=int, default=100, help='source embedding dimension')
 parser.add_argument('--trg_emb_dim', type=int, default=100, help='target embedding dimension')
@@ -25,23 +25,17 @@ parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder numbe
 parser.add_argument('--src_bidirection', type=bool, default=True)
 parser.add_argument('--batch_first', type=bool, default=True)
 parser.add_argument('--dropout', type=float, default=0.0)
-parser.add_argument('--attn_method', default='bahdanau', help='vanilla | bahdanau | luong_dot | luong_concat | luong_general')
+parser.add_argument('--attn_method', default='luong_general', help='vanilla | bahdanau | luong_dot | luong_concat | luong_general')
 parser.add_argument('--network_', default='gru')
 parser.add_argument('--learning_rate', type=float, default=0.0001)
-parser.add_argument('--src_max_lens', type=int, default=256)
-parser.add_argument('--trg_max_lens', type=int, default=30)
+parser.add_argument('--src_max_lens', type=int, default=100)
+parser.add_argument('--trg_max_lens', type=int, default=20)
 opt = parser.parse_args()
 
 vocab2id, id2vocab = construct_vocab(opt.data_dir+'/'+opt.file_vocab)
 print 'The vocabulary size: {0}'.format(len(vocab2id))
 
-if not os.path.exists('batch_folder'):
-    n_batch = create_batch_file(
-        file_name=opt.data_dir+'/'+opt.file_corpus, 
-        batch_size=opt.batch_size
-    )
-else:
-    n_batch = len(glob.glob('batch_folder/batch_*'))
+n_batch = create_batch_file(file_name=opt.data_dir+'/'+opt.file_corpus, batch_size=opt.batch_size)
 print 'The number of batches: {0}'.format(n_batch)
 
 model = Seq2Seq(
@@ -55,7 +49,6 @@ model = Seq2Seq(
     trg_nlayer=opt.trg_num_layers,
     batch_first=opt.batch_first,
     src_bidirect=opt.src_bidirection,
-    batch_size=opt.batch_size,
     dropout=opt.dropout,
     attn_method=opt.attn_method,
     network_=opt.network_
@@ -102,12 +95,6 @@ for epoch in range(opt.n_epoch):
             )
             word_prob = model.decode(logits).data.cpu().numpy().argmax(axis=2)
             sen_pred = [id2vocab[x] for x in word_prob[0]]
-            st_idx = len(sen_pred)
-            for k, wd in enumerate(sen_pred):
-                if wd == '</s>':
-                    st_idx = k
-                    break
-            sen_pred = sen_pred[:st_idx]
             print ' '.join(sen_pred)
             torch.save(
                 model,
