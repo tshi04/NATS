@@ -25,11 +25,12 @@ parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder numbe
 parser.add_argument('--src_bidirection', type=bool, default=True)
 parser.add_argument('--batch_first', type=bool, default=True)
 parser.add_argument('--dropout', type=float, default=0.0)
-parser.add_argument('--attn_method', default='luong_general', help='vanilla | bahdanau | luong_dot | luong_concat | luong_general')
+parser.add_argument('--attn_method', default='bahdanau_concat', help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
 parser.add_argument('--network_', default='gru')
 parser.add_argument('--learning_rate', type=float, default=0.0001)
 parser.add_argument('--src_max_lens', type=int, default=100)
 parser.add_argument('--trg_max_lens', type=int, default=20)
+parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 opt = parser.parse_args()
 
 vocab2id, id2vocab = construct_vocab(opt.data_dir+'/'+opt.file_vocab)
@@ -100,5 +101,10 @@ for epoch in range(opt.n_epoch):
                 model,
                 open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
             )
+        if opt.debug:
+            break
+    if opt.debug:
+        break 
             
-            
+if opt.debug:
+    shutil.rmtree(out_dir)

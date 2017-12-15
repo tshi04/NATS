@@ -8,16 +8,42 @@ arXiv preprint arXiv:1409.0473.
 '''
 class AttentionBahdanau(torch.nn.Module):
 
-    def __init__(self):
+    def __init__(
+        self,
+        attn_method='bahdanau_dot',
+        hidden_size=100,
+        bias=True
+    ):
         super(AttentionBahdanau, self).__init__()   
         
+        self.attn_method = attn_method.lower()
+        self.hidden_size = hidden_size
+        self.bias = bias
+
         self.softmax_ = torch.nn.Softmax().cuda()
         self.tanh_ = torch.nn.Tanh().cuda()
+
+        if self.attn_method == 'bahdanau_concat':
+            self.attn_in = torch.nn.Sequential(
+                torch.nn.Linear(
+                    self.hidden_size*2,
+                    self.hidden_size,
+                    bias=self.bias
+                ),
+                torch.nn.Linear(self.hidden_size, 1, bias=self.bias)
+            ).cuda()
         
     def forward(self, last_dehy, enhy):
         dehy_new = last_dehy.unsqueeze(2)
 
-        attn = torch.bmm(enhy, dehy_new).squeeze(2)
+        if self.attn_method == 'bahdanau_concat':
+            dehy_rep = last_dehy.unsqueeze(1)
+            dehy_rep = dehy_rep.repeat(1, enhy.size(1), 1)
+            cat_hy = torch.cat((enhy, dehy_rep), 2)
+            attn = self.attn_in(cat_hy).squeeze(2)
+        else:
+            attn = torch.bmm(enhy, dehy_new).squeeze(2)
+
         attn = self.softmax_(attn)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
         h_attn = torch.bmm(attn2, enhy).squeeze(1)
@@ -102,7 +128,7 @@ class LSTMDecoder(torch.nn.Module):
         input_size,
         hidden_size,
         num_layers=1,
-        attn_method='bahdanau',
+        attn_method='bahdanau_dot',
         batch_first=True
     ):
         super(LSTMDecoder, self).__init__()
@@ -122,12 +148,15 @@ class LSTMDecoder(torch.nn.Module):
                 self.input_size, 
                 self.hidden_size
             )
-        elif self.attn_method == 'bahdanau':
+        elif self.attn_method[:8] == 'bahdanau':
             self.lstm_ = torch.nn.LSTMCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
             )
-            self.attn_layer = AttentionBahdanau().cuda()
+            self.attn_layer = AttentionBahdanau(
+                attn_method=self.attn_method,
+                hidden_size=self.hidden_size
+            ).cuda()
             
         else:
             self.lstm_ = torch.nn.LSTMCell(
@@ -150,7 +179,7 @@ class LSTMDecoder(torch.nn.Module):
                 hidden_ = self.lstm_(input_[k], hidden_)
                 output_.append(hidden_[0])
                 
-        elif self.attn_method == 'bahdanau':
+        elif self.attn_method[:8] == 'bahdanau':
             for k in range(input_.size(0)):
                 h_attn, attn = self.attn_layer(hidden_[0], encoder_hy.transpose(0,1))
                 x_input = torch.cat((input_[k], h_attn), 1)
@@ -186,7 +215,7 @@ class GRUDecoder(torch.nn.Module):
         input_size,
         hidden_size,
         num_layers=1,
-        attn_method='bahdanau',
+        attn_method='bahdanau_dot',
         batch_first=True
     ):
         super(GRUDecoder, self).__init__()
@@ -206,12 +235,15 @@ class GRUDecoder(torch.nn.Module):
                 self.input_size, 
                 self.hidden_size
             )
-        elif self.attn_method == 'bahdanau':
+        elif self.attn_method[:8] == 'bahdanau':
             self.gru_ = torch.nn.GRUCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
             )
-            self.attn_layer = AttentionBahdanau().cuda()
+            self.attn_layer = AttentionBahdanau(
+                attn_method=self.attn_method,
+                hidden_size=self.hidden_size
+            ).cuda()
             
         else:
             self.gru_ = torch.nn.GRUCell(
@@ -234,7 +266,7 @@ class GRUDecoder(torch.nn.Module):
                 hidden_ = self.gru_(input_[k], hidden_)
                 output_.append(hidden_)
                 
-        elif self.attn_method == 'bahdanau':
+        elif self.attn_method[:8] == 'bahdanau':
             for k in range(input_.size(0)):
                 h_attn, attn = self.attn_layer(hidden_, encoder_hy.transpose(0,1))
                 x_input = torch.cat((input_[k], h_attn), 1)
