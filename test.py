@@ -7,7 +7,6 @@ import glob
 import torch
 from torch.autograd import Variable
 
-from model import *
 from data_utils import *
 from utils import *
 

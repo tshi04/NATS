@@ -23,7 +23,7 @@ class AttentionBahdanau(torch.nn.Module):
         self.softmax_ = torch.nn.Softmax().cuda()
         self.tanh_ = torch.nn.Tanh().cuda()
 
-        if self.attn_method == 'bahdanau_concat':
+        if self.attn_method == 'bahdanau_concat_deep':
             self.attn_in = torch.nn.Sequential(
                 torch.nn.Linear(
                     self.hidden_size*2,
@@ -32,17 +32,21 @@ class AttentionBahdanau(torch.nn.Module):
                 ),
                 torch.nn.Linear(self.hidden_size, 1, bias=self.bias)
             ).cuda()
+        if self.attn_method == 'bahdanau_concat':
+            self.attn_in = torch.nn.Sequential(
+                torch.nn.Linear(self.hidden_size*2, 1, bias=self.bias)
+            ).cuda()
         
     def forward(self, last_dehy, enhy):
         dehy_new = last_dehy.unsqueeze(2)
 
-        if self.attn_method == 'bahdanau_concat':
+        if self.attn_method == 'bahdanau_dot':
+            attn = torch.bmm(enhy, dehy_new).squeeze(2)
+        else:
             dehy_rep = last_dehy.unsqueeze(1)
             dehy_rep = dehy_rep.repeat(1, enhy.size(1), 1)
             cat_hy = torch.cat((enhy, dehy_rep), 2)
             attn = self.attn_in(cat_hy).squeeze(2)
-        else:
-            attn = torch.bmm(enhy, dehy_new).squeeze(2)
 
         attn = self.softmax_(attn)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
@@ -118,7 +122,6 @@ class AttentionLuong(torch.nn.Module):
         h_attn = self.tanh_(h_attn)
 
         return h_attn, attn
-
 '''
 LSTM decoder
 '''    
@@ -174,6 +177,7 @@ class LSTMDecoder(torch.nn.Module):
             input_ = input_.transpose(0,1)
             
         output_ = []
+        out_attn = []
         if self.attn_method == 'vanilla':
             for k in range(input_.size(0)):
                 hidden_ = self.lstm_(input_[k], hidden_)
@@ -185,6 +189,7 @@ class LSTMDecoder(torch.nn.Module):
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.lstm_(x_input, hidden_)
                 output_.append(hidden_[0])
+                out_attn.append(attn)
         else:
             batch_size = input_.size(1)
             h_attn = Variable(
@@ -194,7 +199,8 @@ class LSTMDecoder(torch.nn.Module):
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.lstm_(x_input, hidden_)
                 h_attn, attn = self.attn_layer(hidden_[0], encoder_hy.transpose(0,1))
-                output_.append(hidden_[0])
+                output_.append(h_attn)
+                out_attn.append(attn)
             
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
@@ -203,12 +209,16 @@ class LSTMDecoder(torch.nn.Module):
             batch_size, 
             hidden_size
         )
+        out_attn = torch.cat(out_attn, 0).view(
+            len_seq,
+            attn.size(0),
+            attn.size(1),
+        )
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
             
-        return output_, hidden_, attn
-
+        return output_, hidden_, out_attn
 '''
 GRU decoder
 '''
@@ -264,6 +274,7 @@ class GRUDecoder(torch.nn.Module):
             input_ = input_.transpose(0,1)
             
         output_ = []
+        out_attn = []
         if self.attn_method == 'vanilla':
             for k in range(input_.size(0)):
                 hidden_ = self.gru_(input_[k], hidden_)
@@ -275,6 +286,7 @@ class GRUDecoder(torch.nn.Module):
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.gru_(x_input, hidden_)
                 output_.append(hidden_)
+                out_attn.append(attn)
         else:
             batch_size = input_.size(1)
             h_attn = Variable(
@@ -284,7 +296,8 @@ class GRUDecoder(torch.nn.Module):
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.gru_(x_input, hidden_)
                 h_attn, attn = self.attn_layer(hidden_, encoder_hy.transpose(0,1))
-                output_.append(hidden_)
+                output_.append(h_attn)
+                out_attn.append(attn)
             
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
@@ -293,13 +306,19 @@ class GRUDecoder(torch.nn.Module):
             batch_size, 
             hidden_size
         )
+        out_attn = torch.cat(out_attn, 0).view(
+            len_seq,
+            attn.size(0),
+            attn.size(1),
+        )
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
             
-        return output_, hidden_, attn
-
-    
+        return output_, hidden_, out_attn
+'''
+sequence to sequence model
+''' 
 class Seq2Seq(torch.nn.Module):
     
     def __init__(
@@ -316,7 +335,8 @@ class Seq2Seq(torch.nn.Module):
         src_bidirect=True,
         dropout=0.0,
         attn_method='vanilla',
-        network_='gru'
+        network_='gru',
+        shared_emb=True
     ):
         super(Seq2Seq, self).__init__()
         # parameters
@@ -333,6 +353,7 @@ class Seq2Seq(torch.nn.Module):
         self.dropout = dropout
         self.attn_method = attn_method
         self.network_ = network_.lower()
+        self.shared_emb=shared_emb
         
         self.softmax_ = torch.nn.Softmax().cuda()
         self.tanh_ = torch.nn.Tanh().cuda()
@@ -345,12 +366,27 @@ class Seq2Seq(torch.nn.Module):
         
         # source embedding and target embedding
         # the same for summarization.
-        self.embedding = torch.nn.Embedding(
-            self.src_vocab_size,
-            self.src_emb_dim,
-            padding_idx=0
-        ).cuda()
-        torch.nn.init.uniform(self.embedding.weight, -1.0, 1.0)
+        if self.shared_emb:
+            self.embedding = torch.nn.Embedding(
+                self.src_vocab_size,
+                self.src_emb_dim,
+                padding_idx=0
+            ).cuda()
+            torch.nn.init.uniform(self.embedding.weight, -1.0, 1.0)
+        else:
+            self.src_embedding = torch.nn.Embedding(
+                self.src_vocab_size,
+                self.src_emb_dim,
+                padding_idx=0
+            ).cuda()
+            torch.nn.init.uniform(self.src_embedding.weight, -1.0, 1.0)
+
+            self.trg_embedding = torch.nn.Embedding(
+                self.src_vocab_size,
+                self.src_emb_dim,
+                padding_idx=0
+            ).cuda()
+            torch.nn.init.uniform(self.trg_embedding.weight, -1.0, 1.0)
         # choose network
         if self.network_ == 'lstm':
             # encoder
@@ -398,8 +434,13 @@ class Seq2Seq(torch.nn.Module):
         ).cuda()
         
     def forward(self, input_src, input_trg):
-        src_emb = self.embedding(input_src)
-        trg_emb = self.embedding(input_trg)
+        if self.shared_emb:
+            src_emb = self.embedding(input_src)
+            trg_emb = self.embedding(input_trg)
+        else:
+            src_emb = self.src_embedding(input_src)
+            trg_emb = self.trg_embedding(input_trg)
+            
         
         batch_size = input_src.size(1)
         if self.batch_first:
