@@ -32,7 +32,7 @@ parser.add_argument('--src_max_lens', type=int, default=256)
 parser.add_argument('--trg_max_lens', type=int, default=30)
 opt = parser.parse_args()
 
-model = torch.load('../sum_data/seq2seq_results-1/seq2seq_299_1000.pt').cuda()
+model = torch.load('../sum_data/seq2seq_results-0/seq2seq_299_1000.pt').cuda()
 print model
 
 data_dir = '../sum_data/'
