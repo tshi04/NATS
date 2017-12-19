@@ -1,53 +1,48 @@
 import os
 import re
-import glob
 import shutil
 import numpy as np
 
 import torch
 from torch.autograd import Variable
-'''
-Construct the vocabulary
-'''
-def construct_vocab(file_, max_size=200000, mincount=5):
-    vocab2id = {'<s>': 0, '</s>': 1, '<pad>': 2, '<unk>': 3}
-    id2vocab = {0: '<s>', 1: '</s>', 2: '<pad>', 3: '<unk>'}
-    word_pad = {'<s>': 0, '</s>': 1, '<pad>': 2, '<unk>': 3}
+
+def construct_vocab(file_, mincount=5):
+    vocab2id = {
+        '<s>': 0,
+        '</s>': 1,
+        '<pad>': 2,
+        '<unk>': 3
+    }
     
+    id2vocab = {
+        0: '<s>',
+        1: '</s>',
+        2: '<pad>',
+        3: '<unk>'
+    }
     cnt = 4
     with open(file_, 'r') as fp:
         for line in fp:
-            arr = re.split('\s', line[:-1])
+            try:
+                arr = re.split('<sec>', line[:-1])
+                arr[1]
+            except:
+                arr = re.split('\s', line[:-1])
             if arr[0] == ' ':
-                continue
-            if arr[0] in word_pad:
                 continue
             if int(arr[1]) >= mincount:
                 vocab2id[arr[0]] = cnt
                 id2vocab[cnt] = arr[0]
                 cnt += 1
-            if len(vocab2id) == max_size:
-                break
     
     return vocab2id, id2vocab
-'''
-Split the corpus into batches.
-'''
-def create_batch_file(path_, file_, batch_size, clean=False):
-    file_name = os.path.join(path_, file_)
-    folder = os.path.join(path_, 'batch_folder'+str(batch_size))
+
+def create_batch_file(file_name, batch_size):
+    folder = 'batch_folder'
     fkey = 'batch_'
-    
     if os.path.exists(folder):
-        batch_files = glob.glob(os.path.join(folder, fkey+'*'))
-        if len(batch_files) > 0 and clean==False:
-            return len(batch_files)
-    
-    try:
         shutil.rmtree(folder)
-        os.mkdir(folder)
-    except:
-        os.mkdir(folder)
+    os.mkdir(folder)
     
     fp = open(file_name, 'r')
     cnt = 0
@@ -57,28 +52,19 @@ def create_batch_file(path_, file_, batch_size, clean=False):
         except:
             arr = []
         if len(arr) == batch_size:
-            fout = open(os.path.join(folder, fkey+str(cnt)), 'w')
+            fout = open(folder+'/'+fkey+str(cnt), 'w')
             for itm in arr:
                 fout.write(itm)
             fout.close()
             arr = []
             cnt += 1
-    
-    fout = open(os.path.join(folder, fkey+str(cnt)), 'w')
-    for itm in arr:
-        fout.write(itm)
-    fout.close()
-    arr = []
-    cnt += 1
     fp.close()
     
     return cnt
-'''
-Process the minibatch.
-'''
-def process_minibatch(batch_id, path_, batch_size, vocab2id, max_lens=[400, 100]):
+
+def process_minibatch(batch_id, vocab2id, max_lens=[100, 20]):
     
-    folder = os.path.join(path_, 'batch_folder'+str(batch_size))
+    folder = 'batch_folder'
     fkey = 'batch_'
     file_ = folder + '/' + fkey + str(batch_id)
     fp = open(file_, 'r')
@@ -88,19 +74,21 @@ def process_minibatch(batch_id, path_, batch_size, vocab2id, max_lens=[400, 100]
     trg_lens = []
     for line in fp:
         arr = re.split('<sec>', line[:-1])
+
         dabs = re.split('\s', arr[0])
         dabs = filter(None, dabs)
+        dabs = ['<s>'] + dabs + ['</s>']
         trg_lens.append(len(dabs))
-        
         dabs2id = [
             vocab2id[wd] if wd in vocab2id
             else vocab2id['<unk>']
             for wd in dabs
         ]
         trg_arr.append(dabs2id)
-                
+        
         dart = re.split('\s', arr[1])
         dart = filter(None, dart)
+        dart = ['<s>'] + dart + ['</s>']
         src_lens.append(len(dart))
         dart2id = [
             vocab2id[wd] if wd in vocab2id
@@ -115,13 +103,13 @@ def process_minibatch(batch_id, path_, batch_size, vocab2id, max_lens=[400, 100]
         src_max_lens = max_lens[0]
     trg_max_lens = max(trg_lens)
     if max_lens[1] < max(trg_lens):
-        trg_max_lens = max_lens[1]
-            
-    src_arr = [itm[:src_max_lens] for itm in src_arr]
-    trg_arr = [itm[:trg_max_lens] for itm in trg_arr]
+        trg_max_lens = max(trg_lens)
+    
+    src_arr = [itm[:max_lens[0]] for itm in src_arr]
+    trg_arr = [itm[:max_lens[1]] for itm in trg_arr]
 
     src_arr = [
-        itm + [vocab2id['<pad>']]*(src_max_lens-len(itm))
+        itm[:-1] + [vocab2id['<pad>']]*(1+src_max_lens-len(itm))
         for itm in src_arr
     ]
     trg_input_arr = [

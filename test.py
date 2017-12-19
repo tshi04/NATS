@@ -53,7 +53,7 @@ else:
 print 'The number of batches: {0}'.format(n_batch)
 
 src_var, trg_input_var, trg_output_var = process_minibatch(
-    200, vocab2id, max_lens=[100, 20])
+    500, vocab2id, max_lens=[100, 20])
 for k in range(batch_size):
     print
     print
