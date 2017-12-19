@@ -20,9 +20,6 @@ class AttentionBahdanau(torch.nn.Module):
         self.hidden_size = hidden_size
         self.bias = bias
 
-        self.softmax_ = torch.nn.Softmax().cuda()
-        self.tanh_ = torch.nn.Tanh().cuda()
-
         if self.attn_method == 'bahdanau_concat_deep':
             self.attn_in = torch.nn.Sequential(
                 torch.nn.Linear(
@@ -48,10 +45,10 @@ class AttentionBahdanau(torch.nn.Module):
             cat_hy = torch.cat((enhy, dehy_rep), 2)
             attn = self.attn_in(cat_hy).squeeze(2)
 
-        attn = self.softmax_(attn)
+        attn = F.softmax(attn)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
         h_attn = torch.bmm(attn2, enhy).squeeze(1)
-        h_attn = self.tanh_(h_attn)
+        h_attn = F.tanh(h_attn)
 
         return h_attn, attn
 '''
@@ -71,9 +68,6 @@ class AttentionLuong(torch.nn.Module):
         self.method = attn_method.lower()
         self.hidden_size = hidden_size
         self.bias = bias
-        
-        self.softmax_ = torch.nn.Softmax().cuda()
-        self.tanh_ = torch.nn.Tanh().cuda()
         
         if self.method == 'luong_concat':
             self.attn_in = torch.nn.Sequential(
@@ -113,13 +107,13 @@ class AttentionLuong(torch.nn.Module):
         
             attn = torch.bmm(enhy_new, dehy_new).squeeze(2)
         
-        attn = self.softmax_(attn)
+        attn = F.softmax(attn)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
 
         attn_enhy = torch.bmm(attn2, enhy_new).squeeze(1)
         
         h_attn = self.attn_out(torch.cat((attn_enhy, dehy), 1))
-        h_attn = self.tanh_(h_attn)
+        h_attn = F.tanh(h_attn)
 
         return h_attn, attn
 '''
@@ -141,10 +135,6 @@ class LSTMDecoder(torch.nn.Module):
         self.n_layer = num_layers
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
-        
-        self.softmax_ = torch.nn.Softmax().cuda()
-        self.tanh_ = torch.nn.Tanh().cuda()
-        self.sigmoid_ = torch.nn.Sigmoid().cuda()
         
         if self.attn_method == 'vanilla':
             self.lstm_ = torch.nn.LSTMCell(
@@ -238,10 +228,6 @@ class GRUDecoder(torch.nn.Module):
         self.n_layer = num_layers
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
-        
-        self.softmax_ = torch.nn.Softmax().cuda()
-        self.tanh_ = torch.nn.Tanh().cuda()
-        self.sigmoid_ = torch.nn.Sigmoid().cuda()
         
         if self.attn_method == 'vanilla':
             self.gru_ = torch.nn.GRUCell(
@@ -355,10 +341,6 @@ class Seq2Seq(torch.nn.Module):
         self.network_ = network_.lower()
         self.shared_emb=shared_emb
         
-        self.softmax_ = torch.nn.Softmax().cuda()
-        self.tanh_ = torch.nn.Tanh().cuda()
-        self.sigmoid_ = torch.nn.Sigmoid().cuda()
-        
         self.src_num_directions = 1
         if self.src_bidirect:
             self.src_hidden_dim = src_hidden_dim // 2
@@ -468,7 +450,7 @@ class Seq2Seq(torch.nn.Module):
                 c_t = src_c_t[-1]
                         
             decoder_h0 = self.encoder2decoder(h_t)
-            decoder_h0 = self.tanh_(decoder_h0)
+            decoder_h0 = F.tanh(decoder_h0)
             decoder_c0 = c_t
         
             encoder_hy = src_h.transpose(0,1)
@@ -491,7 +473,7 @@ class Seq2Seq(torch.nn.Module):
                 h_t = src_h_t[-1]
                         
             decoder_h0 = self.encoder2decoder(h_t)
-            decoder_h0 = self.tanh_(decoder_h0)
+            decoder_h0 = F.tanh(decoder_h0)
         
             encoder_hy = src_h.transpose(0,1)
         
@@ -517,7 +499,7 @@ class Seq2Seq(torch.nn.Module):
     
     def decode(self, logits):
         logits_reshape = logits.view(-1, self.trg_vocab_size)
-        word_probs = self.softmax_(logits_reshape)
+        word_probs = F.softmax(logits_reshape)
         word_probs = word_probs.view(
             logits.size(0), logits.size(1), logits.size(2)
         )
