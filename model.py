@@ -45,7 +45,7 @@ class AttentionBahdanau(torch.nn.Module):
             cat_hy = torch.cat((enhy, dehy_rep), 2)
             attn = self.attn_in(cat_hy).squeeze(2)
 
-        attn = F.softmax(attn)
+        attn = F.softmax(attn, dim=1)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
         h_attn = torch.bmm(attn2, enhy).squeeze(1)
         h_attn = F.tanh(h_attn)
@@ -107,7 +107,7 @@ class AttentionLuong(torch.nn.Module):
         
             attn = torch.bmm(enhy_new, dehy_new).squeeze(2)
         
-        attn = F.softmax(attn)
+        attn = F.softmax(attn, dim=1)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
 
         attn_enhy = torch.bmm(attn2, enhy_new).squeeze(1)
@@ -498,8 +498,11 @@ class Seq2Seq(torch.nn.Module):
         return decoder_output, self.attn_
     
     def decode(self, logits):
+        print logits.size()
         logits_reshape = logits.view(-1, self.trg_vocab_size)
-        word_probs = F.softmax(logits_reshape)
+        word_probs = F.softmax(logits_reshape, dim=1)
+        print word_probs.size()
+        print torch.sum(word_probs)
         word_probs = word_probs.view(
             logits.size(0), logits.size(1), logits.size(2)
         )
