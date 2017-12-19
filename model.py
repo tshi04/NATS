@@ -498,11 +498,8 @@ class Seq2Seq(torch.nn.Module):
         return decoder_output, self.attn_
     
     def decode(self, logits):
-        print logits.size()
         logits_reshape = logits.view(-1, self.trg_vocab_size)
         word_probs = F.softmax(logits_reshape, dim=1)
-        print word_probs.size()
-        print torch.sum(word_probs)
         word_probs = word_probs.view(
             logits.size(0), logits.size(1), logits.size(2)
         )

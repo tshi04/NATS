@@ -33,13 +33,12 @@ def construct_vocab(file_, max_size=200000, mincount=5):
 '''
 Split the corpus into batches.
 '''
-def create_batch_file(path_, file_, batch_size, clean=False):
+def create_batch_file(path_, fkey_, file_, batch_size, clean=False):
     file_name = os.path.join(path_, file_)
     folder = os.path.join(path_, 'batch_folder'+str(batch_size))
-    fkey = 'batch_'
     
     if os.path.exists(folder):
-        batch_files = glob.glob(os.path.join(folder, fkey+'*'))
+        batch_files = glob.glob(os.path.join(folder, fkey_+'_*'))
         if len(batch_files) > 0 and clean==False:
             return len(batch_files)
     
@@ -57,14 +56,14 @@ def create_batch_file(path_, file_, batch_size, clean=False):
         except:
             arr = []
         if len(arr) == batch_size:
-            fout = open(os.path.join(folder, fkey+str(cnt)), 'w')
+            fout = open(os.path.join(folder, fkey_+'_'+str(cnt)), 'w')
             for itm in arr:
                 fout.write(itm)
             fout.close()
             arr = []
             cnt += 1
     
-    fout = open(os.path.join(folder, fkey+str(cnt)), 'w')
+    fout = open(os.path.join(folder, fkey_+'_'+str(cnt)), 'w')
     for itm in arr:
         fout.write(itm)
     fout.close()
@@ -76,11 +75,12 @@ def create_batch_file(path_, file_, batch_size, clean=False):
 '''
 Process the minibatch.
 '''
-def process_minibatch(batch_id, path_, batch_size, vocab2id, max_lens=[400, 100]):
+def process_minibatch(batch_id, path_, fkey_, batch_size, vocab2id, max_lens=[400, 100]):
     
     folder = os.path.join(path_, 'batch_folder'+str(batch_size))
-    fkey = 'batch_'
-    file_ = folder + '/' + fkey + str(batch_id)
+    file_ = folder + '/' + fkey_ + '_' + str(batch_id)
+    return prepare_input(file_, vocab2id, max_lens)
+def prepare_input(file_, vocab2id, max_lens=[400, 100]):
     fp = open(file_, 'r')
     src_arr = []
     trg_arr = []

@@ -29,7 +29,7 @@ parser.add_argument('--shared_embedding', type=bool, default=True, help='source 
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 parser.add_argument('--attn_method', default='luong_general', help='vanilla | bahdanau_dot | bahdanau_concat | bahdanau_concat_deep | luong_dot | luong_concat | luong_general')
 parser.add_argument('--network_', default='gru', help='gru | lstm')
-parser.add_argument('--learning_rate', type=float, default=0.002, help='learning rate.')
+parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--src_max_lens', type=int, default=400, help='max length of source documents.')
 parser.add_argument('--trg_max_lens', type=int, default=100, help='max length of trage documents.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
@@ -48,6 +48,7 @@ print 'The vocabulary size: {0}'.format(len(vocab2id))
 
 n_batch = create_batch_file(
     path_=opt.data_dir,
+    fkey_='train',
     file_=opt.file_corpus,
     batch_size=opt.batch_size,
     clean=opt.clean_batch
@@ -90,7 +91,9 @@ start_time = time.time()
 for epoch in range(opt.n_epoch):
     for batch_id in range(n_batch):
         src_var, trg_input_var, trg_output_var = process_minibatch(
-            batch_id, opt.data_dir, opt.batch_size, vocab2id, max_lens=[opt.src_max_lens, opt.trg_max_lens]
+            batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
+            batch_size=opt.batch_size, vocab2id=vocab2id, 
+            max_lens=[opt.src_max_lens, opt.trg_max_lens]
         )
         logits, _ = model(src_var.cuda(), trg_input_var.cuda())
         optimizer.zero_grad()
