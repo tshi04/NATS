@@ -50,6 +50,8 @@ for batch_id in range(test_batch):
         max_lens=[400, 100]
     )
     beam_seq, beam_prb = batch_beam_search(model=model, src_text=src_var, vocab2id=vocab2id, max_len=100)
-    gen_text = beam_seq.data.cpu().numpy()[0, 0]
-    gen_text = [id2vocab[wd] for wd in gen_text]
-    print ' '.join(gen_text)
+    for b in range(batch_size):
+        gen_text = beam_seq.data.cpu().numpy()[b, 0]
+        gen_text = [id2vocab[wd] for wd in gen_text]
+        print ' '.join(gen_text)
+        print '-'*50
