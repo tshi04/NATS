@@ -498,6 +498,7 @@ class Seq2Seq(torch.nn.Module):
         return decoder_output, self.attn_
     
     def decode(self, logits):
+        # here consume a lot of memory.
         word_probs = F.softmax(
             logits.view(-1, logits.size(2)), 
             dim=1
@@ -507,4 +508,3 @@ class Seq2Seq(torch.nn.Module):
         )
 
         return word_probs
-    
