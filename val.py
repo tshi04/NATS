@@ -14,7 +14,7 @@ data_dir = '../sum_data/'
 file_vocab = 'vocab'
 file_val = 'val.txt'
 file_test = 'test.txt'
-batch_size = 16
+batch_size = 8
 
 vocab2id, id2vocab = construct_vocab(
     file_=data_dir+'/'+file_vocab,
@@ -49,15 +49,7 @@ for batch_id in range(test_batch):
         batch_size=batch_size, vocab2id=vocab2id, 
         max_lens=[400, 100]
     )
-    for k in range(batch_size):
-        print
-        print
-        print ' '.join([id2vocab[wd] for wd in src_var[k].data.cpu().numpy()])
-        print
-        print ' '.join([id2vocab[wd] for wd in trg_output_var[k].data.cpu().numpy()])
-        print
-        beam_seq, beam_prb = beam_search(model=model, src_text=src_var[k], vocab2id=vocab2id, max_len=100)
-        gen_text = beam_seq.data.cpu().numpy()[0]
-        gen_text = [id2vocab[wd] for wd in gen_text]
-        print ' '.join(gen_text)
-        print '-'*50
+    beam_seq, beam_prb = batch_beam_search(model=model, src_text=src_var, vocab2id=vocab2id, max_len=100)
+    gen_text = beam_seq.data.cpu().numpy()[0, 0]
+    gen_text = [id2vocab[wd] for wd in gen_text]
+    print ' '.join(gen_text)
