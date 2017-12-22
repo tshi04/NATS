@@ -38,7 +38,7 @@ class AttentionBahdanau(torch.nn.Module):
                 torch.nn.Linear(self.hidden_size*2, 1, bias=self.bias)
             ).cuda()
 
-        if self.coverage_method == 'cover_cat':
+        if self.coverage_method == 'coverage':
             self.cover_ = torch.nn.Linear(
                 input_seqlen*2,
                 input_seqlen
@@ -55,10 +55,8 @@ class AttentionBahdanau(torch.nn.Module):
             cat_hy = torch.cat((enhy, dehy_rep), 2)
             attn = self.attn_in(cat_hy).squeeze(2)
 
-        if self.coverage_method == 'cover_cat':
+        if self.coverage_method == 'coverage':
             attn = self.cover_(torch.cat((attn, past_attn), 1))
-        if self.coverage_method == 'cover_diff':
-            attn -= attn - past_attn
         attn = F.softmax(attn, dim=1)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
         h_attn = torch.bmm(attn2, enhy).squeeze(1)
@@ -292,7 +290,7 @@ class GRUDecoder(torch.nn.Module):
             ).cuda()
         
     def forward(self, input_, hidden_, encoder_hy):
-            
+
         if self.batch_first:
             input_ = input_.transpose(0,1)
             
