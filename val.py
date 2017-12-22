@@ -40,7 +40,7 @@ test_batch = create_batch_file(
 )
 print 'The number of batches (test): {0}'.format(test_batch)
 
-model = torch.load('../sum_data/seq2seq_results-1/seq2seq_4_5000.pt').cuda()
+model = torch.load('../sum_data/seq2seq_results-1/seq2seq_20_1000.pt').cuda()
 print model
 
 for batch_id in range(test_batch):

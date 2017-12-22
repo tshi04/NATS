@@ -27,7 +27,7 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='luong_general', help='vanilla | bahdanau_dot | bahdanau_concat | bahdanau_concat_deep | luong_dot | luong_concat | luong_general')
+parser.add_argument('--attn_method', default='bahdanau_concat', help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
 parser.add_argument('--network_', default='gru', help='gru | lstm')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--src_max_lens', type=int, default=400, help='max length of source documents.')
