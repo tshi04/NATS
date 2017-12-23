@@ -1,7 +1,7 @@
 '''
 Copyright 2017 @ Tian Shi
 @author Tian Shi
-Please contact me by tshi at vt dot edu.
+Please contact tshi at vt dot edu.
 '''
 import torch
 import torch.nn.functional as F
@@ -21,6 +21,7 @@ class AttentionBahdanau(torch.nn.Module):
         self,
         src_seq_len,
         trg_seq_len,
+        attn_hidden_size,
         hidden_size,
         attn_method,
         coverage,
@@ -31,6 +32,7 @@ class AttentionBahdanau(torch.nn.Module):
         self.attn_method = attn_method.lower()
         self.coverage = coverage
         self.hidden_size = hidden_size
+        self.attn_hidden_size = attn_hidden_size
 
         if self.attn_method == 'bahdanau_concat':
             self.attn_in = torch.nn.Sequential(
@@ -44,12 +46,28 @@ class AttentionBahdanau(torch.nn.Module):
             ).cuda()
             
         if self.coverage == 'concat':
-            self.cover_in = torch.nn.Linear(
-                self.src_seq_len*2,
-                self.src_seq_len
-            )
+            self.cover_in = torch.nn.Sequential(
+                torch.nn.Linear(
+                    self.src_seq_len*2,
+                    self.src_seq_len,
+                    bias=True
+                ),
+                torch.nn.Tanh(),
+                torch.nn.Linear(self.src_seq_len, 1, bias=False)
+            ).cuda()
+        elif self.coverage == 'gru':
+            self.gru_ = torch.nn.Sequential(
+                torch.nn.GRUCell(
+                    self.src_seq_len+self.attn_hidden_size, 
+                    self.attn_hidden_size
+                ),
+                torch.nn.Linear(
+                    self.attn_hidden_size, 
+                    self.src_seq_len,
+                    bias=True)
+            ).cuda()
             
-    def forward(self, last_dehy, enhy, past_attn, hitten_attn):
+    def forward(self, last_dehy, enhy, past_attn, hidden_attn):
         dehy_new = last_dehy.unsqueeze(2)
 
         if self.attn_method == 'bahdanau_dot':
@@ -60,11 +78,9 @@ class AttentionBahdanau(torch.nn.Module):
             cat_hy = torch.cat((enhy, dehy_rep), 2)
             attn = self.attn_in(cat_hy).squeeze(2)
             
-        if self.coverage == 'difference': # have a try.
+        if self.coverage == 'simple': # have a try.
             attn -= past_attn
         if self.coverage == 'concat':
-            print attn.size()
-            print past_attn.size()
             self.cover_in(torch.cat((attn, past_attn), 1))
 
         attn = F.softmax(attn, dim=1)
@@ -84,6 +100,7 @@ class AttentionLuong(torch.nn.Module):
         self,
         src_seq_len,
         trg_seq_len,
+        attn_hidden_size,
         hidden_size,
         attn_method,
         coverage,
@@ -94,6 +111,7 @@ class AttentionLuong(torch.nn.Module):
         self.method = attn_method.lower()
         self.hidden_size = hidden_size
         self.coverage = coverage
+        self.attn_hidden_size = attn_hidden_size
         
         if self.method == 'luong_concat':
             self.attn_in = torch.nn.Sequential(
@@ -184,29 +202,31 @@ class LSTMDecoder(torch.nn.Module):
             self.lstm_ = torch.nn.LSTMCell(
                 self.input_size, 
                 self.hidden_size
-            )
+            ).cuda()
         elif self.attn_method[:8] == 'bahdanau':
             self.lstm_ = torch.nn.LSTMCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
-            )
+            ).cuda()
             self.attn_layer = AttentionBahdanau(
                 src_seq_len=self.src_seq_len,
                 trg_seq_len=self.trg_seq_len,
-                attn_method=self.attn_method,
+                attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
+                attn_method=self.attn_method,
                 coverage=self.coverage
             ).cuda()
         elif self.attn_method[:5] == 'luong':
             self.lstm_ = torch.nn.LSTMCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
-            )
+            ).cuda()
             self.attn_layer = AttentionLuong(
                 src_seq_len=self.src_seq_len,
                 trg_seq_len=self.trg_seq_len,
-                attn_method=self.attn_method, 
+                attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
+                attn_method=self.attn_method, 
                 coverage=self.coverage
             ).cuda()
         
@@ -214,7 +234,10 @@ class LSTMDecoder(torch.nn.Module):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
-            
+
+        batch_size = input_.size(1)
+        past_attn = Variable(torch.zeros(batch_size, self.src_seq_len))
+        
         output_ = []
         out_attn = []
         if self.attn_method == 'vanilla':
@@ -222,31 +245,33 @@ class LSTMDecoder(torch.nn.Module):
                 hidden_ = self.lstm_(input_[k], hidden_)
                 output_.append(hidden_[0])
         elif self.attn_method[:8] == 'bahdanau':
-            if self.coverage == 'concat' or self.coverage == 'difference':
+            if self.coverage == 'concat' or self.coverage == 'simple':
                 for k in range(input_.size(0)):
-                    h_attn, attn = self.attn_layer(
+                    h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_[0], 
                         encoder_hy.transpose(0,1),
-                        past_attn=past_attn
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
                     )
-                    pa_alpha=0.5
-                    past_attn = pa_alpha*attn + (1-pa_alpha)*past_attn
+                    past_attn = 0.5*attn + 0.5*past_attn
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.lstm_(x_input, hidden_)
                     output_.append(hidden_[0])
                     out_attn.append(attn)
-            if self.coverage == 'vanilla':
+            if self.coverage == 'vanilla' or self.coverage == 'gru':
                 for k in range(input_.size(0)):
-                    h_attn, attn = self.attn_layer(
+                    h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_[0], 
-                        encoder_hy.transpose(0,1)
+                        encoder_hy.transpose(0,1),
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
                     )
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.lstm_(x_input, hidden_)
                     output_.append(hidden_[0])
                     out_attn.append(attn)
         elif self.attn_method[:5] == 'luong':
-            if self.coverage:
+            if self.coverage == 'concat' or self.coverage == 'simple':
                 batch_size = input_.size(1)
                 h_attn = Variable(
                     torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
@@ -254,11 +279,16 @@ class LSTMDecoder(torch.nn.Module):
                 for k in range(input_.size(0)):
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.lstm_(x_input, hidden_)
-                    h_attn, attn = self.attn_layer(hidden_[0], encoder_hy.transpose(0,1), past_attn=past_attn)
-                    past_attn = pa_alpha*attn + (1-pa_alpha)*past_attn
+                    h_attn, attn, hidden_attn = self.attn_layer(
+                        hidden_[0], 
+                        encoder_hy.transpose(0,1), 
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
+                    )
+                    past_attn = 0.5*attn + 0.5*past_attn
                     output_.append(h_attn)
                     out_attn.append(attn)
-            else:
+            if self.coverage == 'vanilla' or self.coverage == 'gru':
                 batch_size = input_.size(1)
                 h_attn = Variable(
                     torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
@@ -266,7 +296,12 @@ class LSTMDecoder(torch.nn.Module):
                 for k in range(input_.size(0)):
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.lstm_(x_input, hidden_)
-                    h_attn, attn = self.attn_layer(hidden_[0], encoder_hy.transpose(0,1))
+                    h_attn, attn, hidden_attn = self.attn_layer(
+                        hidden_[0], 
+                        encoder_hy.transpose(0,1),
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
+                    )
                     output_.append(h_attn)
                     out_attn.append(attn)
             
@@ -286,7 +321,7 @@ class LSTMDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
             
-        return output_, hidden_, out_attn
+        return output_, hidden_, out_attn, hidden_attn
 '''
 GRU decoder
 '''
@@ -319,29 +354,31 @@ class GRUDecoder(torch.nn.Module):
             self.gru_ = torch.nn.GRUCell(
                 self.input_size, 
                 self.hidden_size
-            )
+            ).cuda()
         elif self.attn_method[:8] == 'bahdanau':
             self.gru_ = torch.nn.GRUCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
-            )
+            ).cuda()
             self.attn_layer = AttentionBahdanau(
                 src_seq_len=self.src_seq_len,
                 trg_seq_len=self.trg_seq_len,
-                attn_method=self.attn_method,
+                attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
+                attn_method=self.attn_method,
                 coverage=self.coverage
             ).cuda()
         elif self.attn_method[:5] == 'luong':
             self.gru_ = torch.nn.GRUCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
-            )
+            ).cuda()
             self.attn_layer = AttentionLuong(
                 src_seq_len=self.src_seq_len,
                 trg_seq_len=self.trg_seq_len,
-                attn_method=self.attn_method, 
+                attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
+                attn_method=self.attn_method,
                 coverage=self.coverage
             ).cuda()
         
@@ -350,6 +387,9 @@ class GRUDecoder(torch.nn.Module):
         if self.batch_first:
             input_ = input_.transpose(0,1)
             
+        batch_size = input_.size(1)
+        past_attn = Variable(torch.zeros(batch_size, self.src_seq_len)).cuda()
+        
         output_ = []
         out_attn = []
         if self.attn_method == 'vanilla':
@@ -357,23 +397,65 @@ class GRUDecoder(torch.nn.Module):
                 hidden_ = self.gru_(input_[k], hidden_)
                 output_.append(hidden_)
         elif self.attn_method[:8] == 'bahdanau':
-            for k in range(input_.size(0)):
-                h_attn, attn = self.attn_layer(hidden_, encoder_hy.transpose(0,1))
-                x_input = torch.cat((input_[k], h_attn), 1)
-                hidden_ = self.gru_(x_input, hidden_)
-                output_.append(hidden_)
-                out_attn.append(attn)
+            if self.coverage == 'concat' or self.coverage == 'simple':
+                for k in range(input_.size(0)):
+                    h_attn, attn, hidden_attn = self.attn_layer(
+                        hidden_, 
+                        encoder_hy.transpose(0,1),
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
+                    )
+                    past_attn = 0.5*attn + 0.5*past_attn
+                    x_input = torch.cat((input_[k], h_attn), 1)
+                    hidden_ = self.gru_(x_input, hidden_)
+                    output_.append(hidden_)
+                    out_attn.append(attn)
+            elif self.coverage == 'vanilla' or self.coverage == 'gru':
+                for k in range(input_.size(0)):
+                    h_attn, attn, hidden_attn = self.attn_layer(
+                        hidden_, 
+                        encoder_hy.transpose(0,1),
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
+                    )
+                    x_input = torch.cat((input_[k], h_attn), 1)
+                    hidden_ = self.gru_(x_input, hidden_)
+                    output_.append(hidden_)
+                    out_attn.append(attn)
         elif self.attn_method[:5] == 'luong':
-            batch_size = input_.size(1)
-            h_attn = Variable(
-                torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
-            ).cuda()
-            for k in range(input_.size(0)):
-                x_input = torch.cat((input_[k], h_attn), 1)
-                hidden_ = self.gru_(x_input, hidden_)
-                h_attn, attn = self.attn_layer(hidden_, encoder_hy.transpose(0,1))
-                output_.append(h_attn)
-                out_attn.append(attn)
+            if self.coverage == 'concat' or self.coverage == 'simple':
+                batch_size = input_.size(1)
+                h_attn = Variable(
+                    torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
+                ).cuda()
+                for k in range(input_.size(0)):
+                    x_input = torch.cat((input_[k], h_attn), 1)
+                    hidden_ = self.gru_(x_input, hidden_)
+                    h_attn, attn, hidden_attn = self.attn_layer(
+                        hidden_, 
+                        encoder_hy.transpose(0,1),
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
+                    )
+                    past_attn = 0.5*attn + 0.5*past_attn
+                    output_.append(h_attn)
+                    out_attn.append(attn)
+            elif self.coverage == 'vanilla' or self.coverage == 'gru':
+                batch_size = input_.size(1)
+                h_attn = Variable(
+                    torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
+                ).cuda()
+                for k in range(input_.size(0)):
+                    x_input = torch.cat((input_[k], h_attn), 1)
+                    hidden_ = self.gru_(x_input, hidden_)
+                    h_attn, attn, hidden_attn = self.attn_layer(
+                        hidden_, 
+                        encoder_hy.transpose(0,1),
+                        past_attn=past_attn,
+                        hidden_attn=hidden_attn
+                    )
+                    output_.append(h_attn)
+                    out_attn.append(attn)
             
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
@@ -391,7 +473,7 @@ class GRUDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
             
-        return output_, hidden_, out_attn
+        return output_, hidden_, out_attn, hidden_attn
 '''
 sequence to sequence model
 ''' 
@@ -541,7 +623,7 @@ class Seq2Seq(torch.nn.Module):
             batch_size, 
             self.src_hidden_dim
         )).cuda()
-        h0_attn = Variable(torch.zeros(
+        hidden_attn = Variable(torch.zeros(
             1,
             batch_size,
             self.attn_hidden_dim
@@ -570,11 +652,11 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, (_, _), self.attn_ = self.decoder(
+            trg_h, (_, _), self.attn_, hidden_attn = self.decoder(
                 trg_emb,
                 (decoder_h0, decoder_c0),
                 encoder_hy,
-                h0_attn
+                hidden_attn
             )
         elif self.network_ == 'gru':
             src_h, src_h_t = self.encoder(
@@ -592,11 +674,11 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, _, self.attn_ = self.decoder(
+            trg_h, _, self.attn_, hidden_attn = self.decoder(
                 trg_emb,
                 decoder_h0,
                 encoder_hy,
-                h0_attn
+                hidden_attn
             )
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(

@@ -28,7 +28,8 @@ parser.add_argument('--attn_hidden_dim', type=int, default=256, help='attn hidde
 parser.add_argument('--src_num_layers', type=int, default=2, help='encoder number layers')
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
-parser.add_argument('--word_mincount', type=int, default=5, help='min count of the words in the corpus in the vocab')
+parser.add_argument('--word_mincount', type=int, default=5, 
+                    help='min count of the words in the corpus in the vocab')
 
 parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder bidirectional?')
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
@@ -37,7 +38,7 @@ parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 parser.add_argument('--attn_method', default='bahdanau_concat', 
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='concat', 
-                    help='difference | vanilla | concat | recurrent')
+                    help='vanilla | simple | concat | rnn')
 parser.add_argument('--network_', default='gru', help='gru | lstm')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 
