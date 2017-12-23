@@ -8,7 +8,7 @@ import time
 import torch
 from torch.autograd import Variable
 
-from model import *
+from model import Seq2Seq
 from data_utils import *
 
 parser = argparse.ArgumentParser()
@@ -17,25 +17,32 @@ parser.add_argument('--file_vocab', default='vocab', help='file store training v
 parser.add_argument('--file_corpus', default='train.txt', help='file store training documents.')
 parser.add_argument('--n_epoch', type=int, default=100, help='number of epochs.')
 parser.add_argument('--batch_size', type=int, default=16, help='batch size.')
+
+parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
+parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
 parser.add_argument('--src_emb_dim', type=int, default=128, help='source embedding dimension')
 parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embedding dimension')
 parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
 parser.add_argument('--trg_hidden_dim', type=int, default=256, help='decoder hidden dimension')
+parser.add_argument('--attn_hidden_dim', type=int, default=256, help='attn hidden dimension')
 parser.add_argument('--src_num_layers', type=int, default=2, help='encoder number layers')
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
+parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
+parser.add_argument('--word_mincount', type=int, default=5, help='min count of the words in the corpus in the vocab')
+
 parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder bidirectional?')
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='bahdanau_concat', help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
+parser.add_argument('--attn_method', default='bahdanau_concat', 
+                    help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
+parser.add_argument('--coverage', default='concat', 
+                    help='difference | vanilla | concat | recurrent')
 parser.add_argument('--network_', default='gru', help='gru | lstm')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
-parser.add_argument('--src_max_lens', type=int, default=400, help='max length of source documents.')
-parser.add_argument('--trg_max_lens', type=int, default=100, help='max length of trage documents.')
+
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
-parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
-parser.add_argument('--word_mincount', type=int, default=5, help='min count of the words in the corpus in the vocab')
 parser.add_argument('--clean_batch', type=bool, default=False, help='Do you want to clean the batch folder?')
 opt = parser.parse_args()
 
@@ -56,10 +63,13 @@ n_batch = create_batch_file(
 print 'The number of batches: {0}'.format(n_batch)
 
 model = Seq2Seq(
+    src_seq_len=opt.src_seq_lens,
+    trg_seq_len=opt.trg_seq_lens,
     src_emb_dim=opt.src_emb_dim,
     trg_emb_dim=opt.trg_emb_dim,
     src_hidden_dim=opt.src_hidden_dim,
     trg_hidden_dim=opt.trg_hidden_dim,
+    attn_hidden_dim=opt.attn_hidden_dim,
     src_vocab_size=len(vocab2id),
     trg_vocab_size=len(vocab2id),
     src_nlayer=opt.src_num_layers,
@@ -68,6 +78,7 @@ model = Seq2Seq(
     src_bidirect=opt.src_bidirection,
     dropout=opt.dropout,
     attn_method=opt.attn_method,
+    coverage=opt.coverage,
     network_=opt.network_,
     shared_emb=opt.shared_embedding
 ).cuda()
@@ -93,7 +104,7 @@ for epoch in range(opt.n_epoch):
         src_var, trg_input_var, trg_output_var = process_minibatch(
             batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
             batch_size=opt.batch_size, vocab2id=vocab2id, 
-            max_lens=[opt.src_max_lens, opt.trg_max_lens]
+            max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
         )
         logits, _ = model(src_var.cuda(), trg_input_var.cuda())
         optimizer.zero_grad()

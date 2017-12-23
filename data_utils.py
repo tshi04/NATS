@@ -106,12 +106,8 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, vocab2id, max_lens=[40
         src_arr.append(dart2id)
     fp.close()
     
-    src_max_lens = max(src_lens) 
-    if max_lens[0] < max(src_lens):
-        src_max_lens = max_lens[0]
-    trg_max_lens = max(trg_lens)
-    if max_lens[1] < max(trg_lens):
-        trg_max_lens = max_lens[1]
+    src_max_lens = max_lens[0]
+    trg_max_lens = max_lens[1]
             
     src_arr = [itm[:src_max_lens] for itm in src_arr]
     trg_arr = [itm[:trg_max_lens] for itm in trg_arr]
