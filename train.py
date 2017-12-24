@@ -24,7 +24,7 @@ parser.add_argument('--src_emb_dim', type=int, default=128, help='source embeddi
 parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embedding dimension')
 parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
 parser.add_argument('--trg_hidden_dim', type=int, default=256, help='decoder hidden dimension')
-parser.add_argument('--attn_hidden_dim', type=int, default=256, help='attn hidden dimension')
+parser.add_argument('--attn_hidden_dim', type=int, default=128, help='attn hidden dimension')
 parser.add_argument('--src_num_layers', type=int, default=2, help='encoder number layers')
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
@@ -35,10 +35,10 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='bahdanau_concat', 
+parser.add_argument('--attn_method', default='bahdanau_concat',
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='concat', 
-                    help='vanilla | simple | concat | rnn')
+parser.add_argument('--coverage', default='gru',
+                    help='vanilla | simple | concat | gru | asee')
 parser.add_argument('--network_', default='gru', help='gru | lstm')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 
@@ -119,7 +119,8 @@ for epoch in range(opt.n_epoch):
 
         torch.nn.utils.clip_grad_norm(model.parameters(), opt.grad_clip)
         
-        losses.append([epoch, batch_id, loss.data.cpu().numpy()[0]])
+        end_time = time.time()
+        losses.append([epoch, batch_id, loss.data.cpu().numpy()[0], (end_time-start_time)/3600.0])
         if batch_id % 1000 == 0:
             loss_np = np.array(losses)
             np.save(out_dir+'/loss', loss_np)

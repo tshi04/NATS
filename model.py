@@ -35,36 +35,40 @@ class AttentionBahdanau(torch.nn.Module):
         self.attn_hidden_size = attn_hidden_size
 
         if self.attn_method == 'bahdanau_concat':
-            self.attn_in = torch.nn.Sequential(
-                torch.nn.Linear(
-                    self.hidden_size*2,
-                    self.hidden_size,
-                    bias=True
-                ),
-                torch.nn.Tanh(),
-                torch.nn.Linear(self.hidden_size, 1, bias=False)
-            ).cuda()
+            if self.coverage == 'asee':
+                self.attn_in = torch.nn.Sequential(
+                    torch.nn.Linear(
+                        self.hidden_size*2+1,
+                        self.hidden_size,
+                        bias=True
+                    ),
+                    torch.nn.Tanh(),
+                    torch.nn.Linear(self.hidden_size, 1, bias=False)
+                ).cuda()
+            else:
+                self.attn_in = torch.nn.Sequential(
+                    torch.nn.Linear(
+                        self.hidden_size*2,
+                        self.hidden_size,
+                        bias=True
+                    ),
+                    torch.nn.Tanh(),
+                    torch.nn.Linear(self.hidden_size, 1, bias=False)
+                ).cuda()
             
         if self.coverage == 'concat':
-            self.cover_in = torch.nn.Sequential(
-                torch.nn.Linear(
-                    self.src_seq_len*2,
-                    self.src_seq_len,
-                    bias=True
-                ),
-                torch.nn.Tanh(),
-                torch.nn.Linear(self.src_seq_len, 1, bias=False)
+            self.cover_in = torch.nn.Linear(
+                self.src_seq_len*2,
+                self.src_seq_len
             ).cuda()
         elif self.coverage == 'gru':
-            self.gru_ = torch.nn.Sequential(
-                torch.nn.GRUCell(
-                    self.src_seq_len+self.attn_hidden_size, 
-                    self.attn_hidden_size
-                ),
-                torch.nn.Linear(
-                    self.attn_hidden_size, 
-                    self.src_seq_len,
-                    bias=True)
+            self.gru_ = torch.nn.GRUCell(
+                self.src_seq_len, 
+                self.attn_hidden_size
+            ).cuda()
+            self.gru_out = torch.nn.Linear(
+                self.attn_hidden_size,
+                self.src_seq_len
             ).cuda()
             
     def forward(self, last_dehy, enhy, past_attn, hidden_attn):
@@ -75,13 +79,19 @@ class AttentionBahdanau(torch.nn.Module):
         if self.attn_method[:15] == 'bahdanau_concat':
             dehy_rep = last_dehy.unsqueeze(1)
             dehy_rep = dehy_rep.repeat(1, enhy.size(1), 1)
-            cat_hy = torch.cat((enhy, dehy_rep), 2)
+            if self.coverage == 'asee':
+                cat_hy = torch.cat((enhy, dehy_rep, past_attn.unsqueeze(2)), 2)
+            else:
+                cat_hy = torch.cat((enhy, dehy_rep), 2)
             attn = self.attn_in(cat_hy).squeeze(2)
             
-        if self.coverage == 'simple': # have a try.
+        if self.coverage == 'simple':
             attn -= past_attn
-        if self.coverage == 'concat':
-            self.cover_in(torch.cat((attn, past_attn), 1))
+        elif self.coverage == 'concat':
+            attn = self.cover_in(torch.cat((attn, past_attn), 1))
+        elif self.coverage == 'gru':
+            hidden_attn = self.gru_(attn, hidden_attn)
+            attn = self.gru_out(hidden_attn)
 
         attn = F.softmax(attn, dim=1)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
@@ -136,16 +146,30 @@ class AttentionLuong(torch.nn.Module):
             bias=True
         ).cuda()
         
-        if self.coverage:
-            self.cover_ = torch.nn.Linear(
-                self.hidden_size*2,
-                self.hide,
-                bias=True
-            )
+        if self.coverage == 'concat':
+            self.cover_in = torch.nn.Sequential(
+                torch.nn.Linear(
+                    self.src_seq_len*2,
+                    self.src_seq_len,
+                    bias=True
+                )
+            ).cuda()
+        elif self.coverage == 'gru':
+            self.gru_ = torch.nn.GRUCell(
+                self.src_seq_len, 
+                self.attn_hidden_size
+            ).cuda()
+            self.gru_out = torch.nn.Linear(
+                self.attn_hidden_size,
+                self.src_seq_len
+            ).cuda()            
         
     def forward(self, dehy, enhy, past_attn, hidden_attn):
         dehy_new = dehy.unsqueeze(2)
         enhy_new = enhy
+        
+        if self.coverage == 'asee':
+            self.coverage == 'vanilla'
         
         if self.method == 'luong_concat':
             dehy_rep = dehy.unsqueeze(1)
@@ -158,8 +182,13 @@ class AttentionLuong(torch.nn.Module):
         
             attn = torch.bmm(enhy_new, dehy_new).squeeze(2)
             
-        if self.coverage:
-            attn = self.cover_(attn, past_attn)
+        if self.coverage == 'simple':
+            attn -= past_attn
+        elif self.coverage == 'concat':
+            attn = self.cover_in(torch.cat((attn, past_attn), 1))
+        elif self.coverage == 'gru':
+            hidden_attn = self.gru_(attn, hidden_attn)
+            attn = self.gru_out(hidden_attn)
         
         attn = F.softmax(attn, dim=1)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
@@ -236,7 +265,7 @@ class LSTMDecoder(torch.nn.Module):
             input_ = input_.transpose(0,1)
 
         batch_size = input_.size(1)
-        past_attn = Variable(torch.zeros(batch_size, self.src_seq_len))
+        past_attn = Variable(torch.zeros(batch_size, self.src_seq_len)).cuda()
         
         output_ = []
         out_attn = []
@@ -258,7 +287,7 @@ class LSTMDecoder(torch.nn.Module):
                     hidden_ = self.lstm_(x_input, hidden_)
                     output_.append(hidden_[0])
                     out_attn.append(attn)
-            if self.coverage == 'vanilla' or self.coverage == 'gru':
+            else:
                 for k in range(input_.size(0)):
                     h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_[0], 
@@ -266,6 +295,7 @@ class LSTMDecoder(torch.nn.Module):
                         past_attn=past_attn,
                         hidden_attn=hidden_attn
                     )
+                    past_attn += attn
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.lstm_(x_input, hidden_)
                     output_.append(hidden_[0])
@@ -288,7 +318,7 @@ class LSTMDecoder(torch.nn.Module):
                     past_attn = 0.5*attn + 0.5*past_attn
                     output_.append(h_attn)
                     out_attn.append(attn)
-            if self.coverage == 'vanilla' or self.coverage == 'gru':
+            else:
                 batch_size = input_.size(1)
                 h_attn = Variable(
                     torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
@@ -298,10 +328,11 @@ class LSTMDecoder(torch.nn.Module):
                     hidden_ = self.lstm_(x_input, hidden_)
                     h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_[0], 
-                        encoder_hy.transpose(0,1),
+                        encoder_hy.transpose(0,1), 
                         past_attn=past_attn,
                         hidden_attn=hidden_attn
                     )
+                    past_attn += attn
                     output_.append(h_attn)
                     out_attn.append(attn)
             
@@ -312,11 +343,12 @@ class LSTMDecoder(torch.nn.Module):
             batch_size, 
             hidden_size
         )
-        out_attn = torch.cat(out_attn, 0).view(
-            len_seq,
-            attn.size(0),
-            attn.size(1),
-        )
+        if not self.attn_method == 'vanilla':
+            out_attn = torch.cat(out_attn, 0).view(
+                len_seq,
+                attn.size(0),
+                attn.size(1),
+            )
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
@@ -410,7 +442,7 @@ class GRUDecoder(torch.nn.Module):
                     hidden_ = self.gru_(x_input, hidden_)
                     output_.append(hidden_)
                     out_attn.append(attn)
-            elif self.coverage == 'vanilla' or self.coverage == 'gru':
+            else:
                 for k in range(input_.size(0)):
                     h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_, 
@@ -418,6 +450,7 @@ class GRUDecoder(torch.nn.Module):
                         past_attn=past_attn,
                         hidden_attn=hidden_attn
                     )
+                    past_attn += attn
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.gru_(x_input, hidden_)
                     output_.append(hidden_)
@@ -440,7 +473,7 @@ class GRUDecoder(torch.nn.Module):
                     past_attn = 0.5*attn + 0.5*past_attn
                     output_.append(h_attn)
                     out_attn.append(attn)
-            elif self.coverage == 'vanilla' or self.coverage == 'gru':
+            else:
                 batch_size = input_.size(1)
                 h_attn = Variable(
                     torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
@@ -454,6 +487,7 @@ class GRUDecoder(torch.nn.Module):
                         past_attn=past_attn,
                         hidden_attn=hidden_attn
                     )
+                    past_attn += attn
                     output_.append(h_attn)
                     out_attn.append(attn)
             
@@ -464,11 +498,13 @@ class GRUDecoder(torch.nn.Module):
             batch_size, 
             hidden_size
         )
-        out_attn = torch.cat(out_attn, 0).view(
-            len_seq,
-            attn.size(0),
-            attn.size(1),
-        )
+        
+        if not self.attn_method == 'vanilla':
+            out_attn = torch.cat(out_attn, 0).view(
+                len_seq,
+                attn.size(0),
+                attn.size(1),
+            )
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
@@ -624,7 +660,6 @@ class Seq2Seq(torch.nn.Module):
             self.src_hidden_dim
         )).cuda()
         hidden_attn = Variable(torch.zeros(
-            1,
             batch_size,
             self.attn_hidden_dim
         )).cuda()
