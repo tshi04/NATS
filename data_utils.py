@@ -10,9 +10,9 @@ from torch.autograd import Variable
 Construct the vocabulary
 '''
 def construct_vocab(file_, max_size=200000, mincount=5):
-    vocab2id = {'<s>': 0, '</s>': 1, '<pad>': 2, '<unk>': 3}
-    id2vocab = {0: '<s>', 1: '</s>', 2: '<pad>', 3: '<unk>'}
-    word_pad = {'<s>': 0, '</s>': 1, '<pad>': 2, '<unk>': 3}
+    vocab2id = {'<s>': 2, '</s>': 3, '<pad>': 1, '<unk>': 0}
+    id2vocab = {2: '<s>', 3: '</s>', 1: '<pad>', 0: '<unk>'}
+    word_pad = {'<s>': 2, '</s>': 3, '<pad>': 1, '<unk>': 0}
     
     cnt = 4
     with open(file_, 'r') as fp:
