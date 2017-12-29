@@ -16,7 +16,7 @@ parser.add_argument('--data_dir', default='../sum_data/', help='directory that s
 parser.add_argument('--file_vocab', default='vocab', help='file store training vocabulary.')
 parser.add_argument('--file_corpus', default='train.txt', help='file store training documents.')
 parser.add_argument('--n_epoch', type=int, default=100, help='number of epochs.')
-parser.add_argument('--batch_size', type=int, default=32, help='batch size.')
+parser.add_argument('--batch_size', type=int, default=16, help='batch size.')
 
 parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
 parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
