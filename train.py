@@ -16,7 +16,7 @@ parser.add_argument('--data_dir', default='../sum_data/', help='directory that s
 parser.add_argument('--file_vocab', default='vocab', help='file store training vocabulary.')
 parser.add_argument('--file_corpus', default='train.txt', help='file store training documents.')
 parser.add_argument('--n_epoch', type=int, default=100, help='number of epochs.')
-parser.add_argument('--batch_size', type=int, default=16, help='batch size.')
+parser.add_argument('--batch_size', type=int, default=32, help='batch size.')
 
 parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
 parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
@@ -35,9 +35,10 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
+
 parser.add_argument('--attn_method', default='bahdanau_concat',
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='gru',
+parser.add_argument('--coverage', default='vanilla',
                     help='vanilla | simple | concat | gru | asee')
 parser.add_argument('--network_', default='gru', help='gru | lstm')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
@@ -121,7 +122,7 @@ for epoch in range(opt.n_epoch):
         
         end_time = time.time()
         losses.append([epoch, batch_id, loss.data.cpu().numpy()[0], (end_time-start_time)/3600.0])
-        if batch_id % 1000 == 0:
+        if batch_id % 2000 == 0:
             loss_np = np.array(losses)
             np.save(out_dir+'/loss', loss_np)
             fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
@@ -139,7 +140,13 @@ for epoch in range(opt.n_epoch):
         if opt.debug:
             break
     if opt.debug:
-        break 
+        break
+        
+loss_np = np.array(losses)
+np.save(out_dir+'/loss', loss_np)
+fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
+torch.save(model, fmodel)
+fmodel.close()
             
 if opt.debug:
     shutil.rmtree(out_dir)
