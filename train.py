@@ -139,14 +139,16 @@ for epoch in range(opt.n_epoch):
             print ' '.join(sen_pred)
         if opt.debug:
             break
+        
+    loss_np = np.array(losses)
+    np.save(out_dir+'/loss', loss_np)
+    fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
+    torch.save(model, fmodel)
+    fmodel.close()
+
     if opt.debug:
         break
-        
-loss_np = np.array(losses)
-np.save(out_dir+'/loss', loss_np)
-fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
-torch.save(model, fmodel)
-fmodel.close()
             
 if opt.debug:
     shutil.rmtree(out_dir)
+
