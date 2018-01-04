@@ -246,7 +246,7 @@ class LSTMDecoder(torch.nn.Module):
                 coverage=self.coverage
             ).cuda()
         
-    def forward(self, input_, hidden_, encoder_hy, hidden_attn, past_attn):
+    def forward(self, input_, hidden_, h_attn, encoder_hy, hidden_attn, past_attn):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -287,11 +287,9 @@ class LSTMDecoder(torch.nn.Module):
                     output_.append(hidden_[0])
                     out_attn.append(attn)
         elif self.attn_method[:5] == 'luong':
+            # luong need init h_attn
             if self.coverage == 'concat' or self.coverage == 'simple':
                 batch_size = input_.size(1)
-                h_attn = Variable(
-                    torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
-                ).cuda()
                 for k in range(input_.size(0)):
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.lstm_(x_input, hidden_)
@@ -306,9 +304,6 @@ class LSTMDecoder(torch.nn.Module):
                     out_attn.append(attn)
             else:
                 batch_size = input_.size(1)
-                h_attn = Variable(
-                    torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
-                ).cuda()
                 for k in range(input_.size(0)):
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.lstm_(x_input, hidden_)
@@ -338,8 +333,8 @@ class LSTMDecoder(torch.nn.Module):
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
-            
-        return output_, hidden_, out_attn, hidden_attn
+   
+        return output_, hidden_, h_attn, out_attn, hidden_attn, past_attn
 '''
 GRU decoder
 '''
@@ -400,7 +395,7 @@ class GRUDecoder(torch.nn.Module):
                 coverage=self.coverage
             ).cuda()
         
-    def forward(self, input_, hidden_, encoder_hy, hidden_attn, past_attn):
+    def forward(self, input_, hidden_, h_attn, encoder_hy, hidden_attn, past_attn):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -417,7 +412,7 @@ class GRUDecoder(torch.nn.Module):
             if self.coverage == 'concat' or self.coverage == 'simple':
                 for k in range(input_.size(0)):
                     h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_, 
+                        hidden_,
                         encoder_hy.transpose(0,1),
                         past_attn=past_attn,
                         hidden_attn=hidden_attn
@@ -443,9 +438,6 @@ class GRUDecoder(torch.nn.Module):
         elif self.attn_method[:5] == 'luong':
             if self.coverage == 'concat' or self.coverage == 'simple':
                 batch_size = input_.size(1)
-                h_attn = Variable(
-                    torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
-                ).cuda()
                 for k in range(input_.size(0)):
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.gru_(x_input, hidden_)
@@ -460,9 +452,6 @@ class GRUDecoder(torch.nn.Module):
                     out_attn.append(attn)
             else:
                 batch_size = input_.size(1)
-                h_attn = Variable(
-                    torch.FloatTensor(torch.zeros(batch_size, self.hidden_size))
-                ).cuda()
                 for k in range(input_.size(0)):
                     x_input = torch.cat((input_[k], h_attn), 1)
                     hidden_ = self.gru_(x_input, hidden_)
@@ -483,7 +472,6 @@ class GRUDecoder(torch.nn.Module):
             batch_size, 
             hidden_size
         )
-        
         if not self.attn_method == 'vanilla':
             out_attn = torch.cat(out_attn, 0).view(
                 len_seq,
@@ -493,8 +481,8 @@ class GRUDecoder(torch.nn.Module):
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
-            
-        return output_, hidden_, out_attn, hidden_attn
+
+        return output_, hidden_, h_attn, out_attn, hidden_attn, past_attn
 '''
 sequence to sequence model
 ''' 
@@ -634,7 +622,6 @@ class Seq2Seq(torch.nn.Module):
             src_emb = self.src_embedding(input_src)
             trg_emb = self.trg_embedding(input_trg)
             
-        
         batch_size = input_src.size(1)
         if self.batch_first:
             batch_size = input_src.size(0)
@@ -652,6 +639,9 @@ class Seq2Seq(torch.nn.Module):
             batch_size, 
             self.src_seq_len
         )).cuda()
+        h_attn = Variable(
+            torch.FloatTensor(torch.zeros(batch_size, self.trg_hidden_dim))
+        ).cuda()
 
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
@@ -676,9 +666,10 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, (_, _), self.attn_, hidden_attn = self.decoder(
+            trg_h, (_, _), _, attn_, hidden_attn, _ = self.decoder(
                 trg_emb,
                 (decoder_h0, decoder_c0),
+                h_attn,
                 encoder_hy,
                 hidden_attn,
                 past_attn
@@ -699,9 +690,10 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, _, self.attn_, hidden_attn = self.decoder(
+            trg_h, _, _, attn_, hidden_attn, _ = self.decoder(
                 trg_emb,
                 decoder_h0,
+                h_attn,
                 encoder_hy,
                 hidden_attn,
                 past_attn
@@ -712,6 +704,7 @@ class Seq2Seq(torch.nn.Module):
             trg_h.size(2)
         )
         # here consume a lot of memory. output
+        # decoder_ouput is also logits in this code.
         decoder_output = self.decoder2vocab(trg_h_reshape)
         decoder_output = decoder_output.view(
             trg_h.size(0),
@@ -719,7 +712,129 @@ class Seq2Seq(torch.nn.Module):
             decoder_output.size(1)
         )
 
-        return decoder_output, self.attn_
+        return decoder_output, attn_
+    
+    def forward_encoder(self, input_src):
+        if self.shared_emb:
+            src_emb = self.embedding(input_src)
+        else:
+            src_emb = self.src_embedding(input_src)
+            
+        batch_size = input_src.size(1)
+        if self.batch_first:
+            batch_size = input_src.size(0)
+
+        h0_encoder = Variable(torch.zeros(
+            self.encoder.num_layers*self.src_num_directions,
+            batch_size, 
+            self.src_hidden_dim
+        )).cuda()
+        hidden_attn = Variable(torch.zeros(
+            batch_size,
+            self.attn_hidden_dim
+        )).cuda()
+        past_attn = Variable(torch.zeros(
+            batch_size, 
+            self.src_seq_len
+        )).cuda()
+        h_attn = Variable(
+            torch.FloatTensor(torch.zeros(batch_size, self.trg_hidden_dim))
+        ).cuda()
+
+        if self.network_ == 'lstm':
+            c0_encoder = Variable(torch.zeros(
+                self.encoder.num_layers*self.src_num_directions,
+                batch_size, self.src_hidden_dim)).cuda()
+
+            src_h, (src_h_t, src_c_t) = self.encoder(
+                src_emb, 
+                (h0_encoder, c0_encoder)
+            )
+
+            if self.src_bidirect:
+                h_t = torch.cat((src_h_t[-1], src_h_t[-2]), 1)
+                c_t = torch.cat((src_c_t[-1], src_c_t[-2]), 1)
+            else:
+                h_t = src_h_t[-1]
+                c_t = src_c_t[-1]
+                        
+            decoder_h0 = self.encoder2decoder(h_t)
+            decoder_h0 = F.tanh(decoder_h0)
+            decoder_c0 = c_t
+        
+            encoder_hy = src_h.transpose(0,1)
+            
+            return encoder_hy, (decoder_h0, decoder_c0), hidden_attn, past_attn
+        
+        elif self.network_ == 'gru':
+            src_h, src_h_t = self.encoder(
+                src_emb,
+                h0_encoder
+            )
+
+            if self.src_bidirect:
+                h_t = torch.cat((src_h_t[-1], src_h_t[-2]), 1)
+            else:
+                h_t = src_h_t[-1]
+                        
+            decoder_h0 = self.encoder2decoder(h_t)
+            decoder_h0 = F.tanh(decoder_h0)
+        
+            encoder_hy = src_h.transpose(0,1)
+        
+            return encoder_hy, decoder_h0, h_attn, hidden_attn, past_attn
+    
+    def forward_onestep_decoder(
+        self, 
+        input_trg,
+        hidden_decoder,
+        h_attn,
+        encoder_hy,
+        hidden_attn,
+        past_attn
+    ):
+        if self.shared_emb:
+            trg_emb = self.embedding(input_trg)
+        else:
+            trg_emb = self.trg_embedding(input_trg)
+            
+        batch_size = input_trg.size(1)
+        if self.batch_first:
+            batch_size = input_trg.size(0)
+
+        if self.network_ == 'lstm':
+            trg_h, hidden_decoder, h_attn, attn_, hidden_attn, past_attn = self.decoder(
+                trg_emb,
+                hidden_decoder,
+                h_attn,
+                encoder_hy,
+                hidden_attn,
+                past_attn
+            )
+        elif self.network_ == 'gru':
+            trg_h, hidden_decoder, h_attn, attn_, hidden_attn, past_attn = self.decoder(
+                trg_emb,
+                hidden_decoder,
+                h_attn,
+                encoder_hy,
+                hidden_attn,
+                past_attn
+            )
+        # prepare output
+        trg_h_reshape = trg_h.contiguous().view(
+            trg_h.size(0) * trg_h.size(1),
+            trg_h.size(2)
+        )
+        # here consume a lot of memory. output
+        # decoder_ouput is also logits in this code.
+        decoder_output = self.decoder2vocab(trg_h_reshape)
+        decoder_output = decoder_output.view(
+            trg_h.size(0),
+            trg_h.size(1),
+            decoder_output.size(1)
+        )
+
+        return decoder_output, hidden_decoder, h_attn, hidden_attn, past_attn
     
     def decode(self, logits):
         # here consume a lot of memory.

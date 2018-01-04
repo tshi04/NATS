@@ -10,11 +10,12 @@ from torch.autograd import Variable
 
 from data_utils import *
 from utils import *
+from model import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--data_dir', default='../sum_data', help='directory that store the data.')
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_0_0.pt', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_34_8000.pt', help='file for model.')
 parser.add_argument('--file_vocab', default='vocab', help='file store training vocabulary.')
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--batch_size', type=int, default=8, help='batch size.')
@@ -22,7 +23,8 @@ parser.add_argument('--vocab_size', type=int, default=50000, help='max number of
 parser.add_argument('--word_mincount', type=int, default=5, 
                     help='min count of the words in the corpus in the vocab')
 parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
-parser.add_argument('--trg_seq_lens', type=int, default=120, help='length of trage documents.')
+parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of target documents.')
+parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 opt = parser.parse_args()
 
 vocab2id, id2vocab = construct_vocab(
@@ -41,21 +43,41 @@ test_batch = create_batch_file(
 )
 print 'The number of batches (test): {0}'.format(test_batch)
 
+model = Seq2Seq(
+    src_seq_len=opt.src_seq_lens,
+    trg_seq_len=opt.trg_seq_lens,
+    src_emb_dim=opt.src_emb_dim,
+    trg_emb_dim=opt.trg_emb_dim,
+    src_hidden_dim=opt.src_hidden_dim,
+    trg_hidden_dim=opt.trg_hidden_dim,
+    attn_hidden_dim=opt.attn_hidden_dim,
+    src_vocab_size=len(vocab2id),
+    trg_vocab_size=len(vocab2id),
+    src_nlayer=opt.src_num_layers,
+    trg_nlayer=opt.trg_num_layers,
+    batch_first=opt.batch_first,
+    src_bidirect=opt.src_bidirection,
+    dropout=opt.dropout,
+    attn_method=opt.attn_method,
+    coverage=opt.coverage,
+    network_=opt.network_,
+    shared_emb=opt.shared_embedding
+).cuda()
+
 model = torch.load(os.path.join(opt.data_dir, opt.model_dir, opt.model_file)).cuda()
 print model
 
 start_time = time.time()
 fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
 for batch_id in range(test_batch):
-    
     src_var, trg_input_var, trg_output_var = process_minibatch(
         batch_id=batch_id, path_=opt.data_dir, fkey_='test', 
         batch_size=opt.batch_size, vocab2id=vocab2id, 
         max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
     )
-    beam_seq, beam_prb = batch_beam_search(model=model, src_text=src_var, vocab2id=vocab2id, max_len=opt.trg_seq_lens)
+    beam_seq, beam_prb = batch_beam_search(model=model, src_text=src_var, vocab2id=vocab2id, beam_size=opt.beam_size, max_len=opt.trg_seq_lens)
     trg_seq = trg_output_var.data.numpy()
-    for b in range(opt.batch_size):
+    for b in range(trg_seq.shape[0]):
         arr = []
         gen_text = beam_seq.data.cpu().numpy()[b,0]
         gen_text = [id2vocab[wd] for wd in gen_text]
@@ -70,10 +92,11 @@ for batch_id in range(test_batch):
 fout.close()
 
 rouge_path = os.path.join(opt.data_dir, 'rouge')
+if os.path.exists(rouge_path):
+    shutil.rmtree(rouge_path)
+os.makedirs(rouge_path)
 sys_smm_path = os.path.join(rouge_path, 'system_summaries')
 mod_smm_path = os.path.join(rouge_path, 'model_summaries')
-shutil.rmtree(rouge_path)
-os.makedirs(rouge_path)
 os.makedirs(sys_smm_path)
 os.makedirs(mod_smm_path)
 fp = open(os.path.join(opt.data_dir, 'summaries.txt'), 'r')
