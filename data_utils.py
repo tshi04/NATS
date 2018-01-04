@@ -54,7 +54,7 @@ def create_batch_file(path_, fkey_, file_, batch_size, clean=False):
         try:
             arr.append(line)
         except:
-            arr = []
+            arr = [line]
         if len(arr) == batch_size:
             fout = open(os.path.join(folder, str(cnt)), 'w')
             for itm in arr:
