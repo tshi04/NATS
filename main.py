@@ -49,6 +49,8 @@ parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory 
 parser.add_argument('--model_file', default='seq2seq_34_8000', help='file for model.')
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
+# used in validation
+parser.add_argument('--file_val', default='val.txt', help='test data')
 opt = parser.parse_args()
 
 vocab2id, id2vocab = construct_vocab(
@@ -76,7 +78,7 @@ elif opt.task == 'test' or opt.task == 'fastbeam':
     )
     print 'The number of batches (test): {0}'.format(test_batch)
 
-if opt.task == 'train' or opt.task == 'fastbeam' or opt.task == 'test':
+if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or opt.task == 'test':
     model = Seq2Seq(
         src_seq_len=opt.src_seq_lens,
         trg_seq_len=opt.trg_seq_lens,
@@ -166,6 +168,51 @@ if opt.task == 'train':
             
     if opt.debug:
         shutil.rmtree(out_dir)
+'''
+validate
+'''
+if opt.task == 'validate':
+    val_batch = create_batch_file(
+        path_=opt.data_dir,
+        fkey_='validate',
+        file_=opt.file_val,
+        batch_size=opt.batch_size,
+        clean=False
+    )
+    print 'The number of batches (test): {0}'.format(val_batch)
+    
+    weight_mask = torch.ones(len(vocab2id)).cuda()
+    weight_mask[vocab2id['<pad>']] = 0
+    loss_criterion = torch.nn.CrossEntropyLoss(weight=weight_mask).cuda()
+    
+    model_para_files = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.model'))
+    model_para_files = sorted(model_para_files)
+
+    start_time = time.time()
+    fout = open(os.path.join(opt.data_dir, 'model_validate.txt'), 'w')
+    for fl_ in model_para_files:
+        losses = []
+        model.load_state_dict(torch.load(os.path.join(fl_)))
+        for batch_id in range(val_batch):
+            src_var, trg_input_var, trg_output_var = process_minibatch(
+                batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
+                batch_size=opt.batch_size, vocab2id=vocab2id, 
+                max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
+            )
+            logits, _ = model(src_var.cuda(), trg_input_var.cuda())
+            loss = loss_criterion(
+                logits.contiguous().view(-1, len(vocab2id)),
+                trg_output_var.view(-1).cuda()
+            )
+            losses.append(loss.data.cpu().numpy()[0])
+            print batch_id,
+        print
+        losses = np.array(losses)
+        end_time = time.time()
+        itm = [fl_, str(np.average(losses)), str(end_time-start_time)]
+        print ' '.join(itm)
+        fout.write(' '.join(itm)+'\n')
+    fout.close()
 '''
 rouge
 '''
@@ -290,9 +337,3 @@ if opt.task == 'fastbeam':
         print(batch_id, end_time-start_time)
     
     fout.close()
-    
-'''
-validate
-'''
-if opt.task == 'validate':
-    print 'good'
