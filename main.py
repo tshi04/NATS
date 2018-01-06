@@ -40,6 +40,7 @@ parser.add_argument('--attn_method', default='bahdanau_concat',
 parser.add_argument('--coverage', default='simple',
                     help='vanilla | simple | concat | gru | asee')
 parser.add_argument('--network_', default='gru', help='gru | lstm')
+parser.add_argument('--attn_as_input', type=bool, default=True, help='Luong Attn Method use h_attn as input as well.')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
@@ -97,6 +98,7 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or op
         attn_method=opt.attn_method,
         coverage=opt.coverage,
         network_=opt.network_,
+        attn_as_input=opt.attn_as_input,
         shared_emb=opt.shared_embedding
     ).cuda()
     print model

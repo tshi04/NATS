@@ -2,6 +2,9 @@
 Copyright 2017 @ Tian Shi
 @author Tian Shi
 Please contact tshi at vt dot edu.
+
+This framework is not flexiable in the length of encoder and decoder,
+since we need to use the coverage mechanism.
 '''
 import torch
 import torch.nn.functional as F
@@ -200,6 +203,7 @@ class LSTMDecoder(torch.nn.Module):
         num_layers,
         attn_method,
         coverage,
+        attn_as_input,
         batch_first
     ):
         super(LSTMDecoder, self).__init__()
@@ -213,6 +217,7 @@ class LSTMDecoder(torch.nn.Module):
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
+        self.attn_as_input=attn_as_input
         
         if self.attn_method == 'vanilla':
             self.lstm_ = torch.nn.LSTMCell(
@@ -233,10 +238,16 @@ class LSTMDecoder(torch.nn.Module):
                 coverage=self.coverage
             ).cuda()
         elif self.attn_method[:5] == 'luong':
-            self.lstm_ = torch.nn.LSTMCell(
-                self.input_size+self.hidden_size, 
-                self.hidden_size
-            ).cuda()
+            if self.attn_as_input:
+                self.lstm_ = torch.nn.LSTMCell(
+                    self.input_size+self.hidden_size, 
+                    self.hidden_size
+                ).cuda()
+            else:
+                self.lstm_ = torch.nn.LSTMCell(
+                    self.input_size,
+                    self.hidden_size
+                ).cuda()
             self.attn_layer = AttentionLuong(
                 src_seq_len=self.src_seq_len,
                 trg_seq_len=self.trg_seq_len,
@@ -291,7 +302,10 @@ class LSTMDecoder(torch.nn.Module):
             if self.coverage == 'concat' or self.coverage == 'simple':
                 batch_size = input_.size(1)
                 for k in range(input_.size(0)):
-                    x_input = torch.cat((input_[k], h_attn), 1)
+                    if self.attn_as_input:
+                        x_input = torch.cat((input_[k], h_attn), 1)
+                    else:
+                        x_input = input_[k]
                     hidden_ = self.lstm_(x_input, hidden_)
                     h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_[0], 
@@ -305,7 +319,10 @@ class LSTMDecoder(torch.nn.Module):
             else:
                 batch_size = input_.size(1)
                 for k in range(input_.size(0)):
-                    x_input = torch.cat((input_[k], h_attn), 1)
+                    if self.attn_as_input:
+                        x_input = torch.cat((input_[k], h_attn), 1)
+                    else:
+                        x_input = input_[k]
                     hidden_ = self.lstm_(x_input, hidden_)
                     h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_[0], 
@@ -349,6 +366,7 @@ class GRUDecoder(torch.nn.Module):
         num_layers,
         attn_method,
         coverage,
+        attn_as_input,
         batch_first
     ):
         super(GRUDecoder, self).__init__()
@@ -362,6 +380,7 @@ class GRUDecoder(torch.nn.Module):
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
+        self.attn_as_input=attn_as_input
         
         if self.attn_method == 'vanilla':
             self.gru_ = torch.nn.GRUCell(
@@ -382,10 +401,16 @@ class GRUDecoder(torch.nn.Module):
                 coverage=self.coverage
             ).cuda()
         elif self.attn_method[:5] == 'luong':
-            self.gru_ = torch.nn.GRUCell(
-                self.input_size+self.hidden_size, 
-                self.hidden_size
-            ).cuda()
+            if self.attn_as_input:
+                self.gru_ = torch.nn.GRUCell(
+                    self.input_size+self.hidden_size, 
+                    self.hidden_size
+                ).cuda()
+            else:
+                self.gru_ = torch.nn.GRUCell(
+                    self.input_size, 
+                    self.hidden_size
+                ).cuda()
             self.attn_layer = AttentionLuong(
                 src_seq_len=self.src_seq_len,
                 trg_seq_len=self.trg_seq_len,
@@ -439,7 +464,10 @@ class GRUDecoder(torch.nn.Module):
             if self.coverage == 'concat' or self.coverage == 'simple':
                 batch_size = input_.size(1)
                 for k in range(input_.size(0)):
-                    x_input = torch.cat((input_[k], h_attn), 1)
+                    if self.attn_as_input:
+                        x_input = torch.cat((input_[k], h_attn), 1)
+                    else:
+                        x_input = input_[k]
                     hidden_ = self.gru_(x_input, hidden_)
                     h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_, 
@@ -453,7 +481,10 @@ class GRUDecoder(torch.nn.Module):
             else:
                 batch_size = input_.size(1)
                 for k in range(input_.size(0)):
-                    x_input = torch.cat((input_[k], h_attn), 1)
+                    if self.attn_as_input:
+                        x_input = torch.cat((input_[k], h_attn), 1)
+                    else:
+                        x_input = input_[k]
                     hidden_ = self.gru_(x_input, hidden_)
                     h_attn, attn, hidden_attn = self.attn_layer(
                         hidden_, 
@@ -507,6 +538,7 @@ class Seq2Seq(torch.nn.Module):
         attn_method='vanilla',
         coverage='vanilla',
         network_='gru',
+        attn_as_input=True, # For Luong's method only
         shared_emb=True
     ):
         super(Seq2Seq, self).__init__()
@@ -529,6 +561,7 @@ class Seq2Seq(torch.nn.Module):
         self.coverage = coverage.lower()
         self.network_ = network_.lower()
         self.shared_emb=shared_emb
+        self.attn_as_input=attn_as_input
         
         self.src_num_directions = 1
         if self.src_bidirect:
@@ -579,6 +612,7 @@ class Seq2Seq(torch.nn.Module):
                 num_layers=1,
                 attn_method=self.attn_method,
                 coverage=self.coverage,
+                attn_as_input=self.attn_as_input,
                 batch_first=self.batch_first
             ).cuda()
         elif self.network_ == 'gru':
@@ -601,6 +635,7 @@ class Seq2Seq(torch.nn.Module):
                 num_layers=1,
                 attn_method=self.attn_method,
                 coverage=self.coverage,
+                attn_as_input=self.attn_as_input,
                 batch_first=self.batch_first
             ).cuda()
         # encoder to decoder
