@@ -650,6 +650,10 @@ class Seq2Seq(torch.nn.Module):
         ).cuda()
         
     def forward(self, input_src, input_trg):
+        # in this work, we did not consider the mask to the <pad> words.
+        # however, since we make the vector to 0, so that <pad> won't affect too much.
+        # Now there is no theoretical proof of it, but according to the results, the 
+        # peformance is good enough.
         if self.shared_emb:
             src_emb = self.embedding(input_src)
             trg_emb = self.embedding(input_trg)
