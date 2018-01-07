@@ -142,7 +142,7 @@ if opt.task == 'train':
         
             end_time = time.time()
             losses.append([epoch, batch_id, loss.data.cpu().numpy()[0], (end_time-start_time)/3600.0])
-            if batch_id % 2000 == 0:
+            if batch_id%2000 == 0:
                 loss_np = np.array(losses)
                 np.save(out_dir+'/loss', loss_np)
                 fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
