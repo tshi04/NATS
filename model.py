@@ -803,7 +803,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
             
-            return encoder_hy, (decoder_h0, decoder_c0), hidden_attn, past_attn
+            return encoder_hy, (decoder_h0, decoder_c0), h_attn, hidden_attn, past_attn
         
         elif self.network_ == 'gru':
             src_h, src_h_t = self.encoder(

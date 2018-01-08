@@ -34,15 +34,23 @@ def fast_beam_search(
     
     for j in range(max_len):
         if network == 'lstm':
-            pass
-        logits, hidden_decoder, h_attn, hidden_attn, past_attn = model.forward_onestep_decoder(
-            last_wd.view(-1, 1), 
-            hidden_decoder_new,
-            h_attn_new, 
-            encoder_hy, 
-            hidden_attn_new, 
-            past_attn_new
-        )
+            logits, (h0, c0), h_attn, hidden_attn, past_attn = model.forward_onestep_decoder(
+                last_wd.view(-1, 1), 
+                (h0_new, c0_new),
+                h_attn_new, 
+                encoder_hy, 
+                hidden_attn_new, 
+                past_attn_new
+            )
+        else:
+            logits, hidden_decoder, h_attn, hidden_attn, past_attn = model.forward_onestep_decoder(
+                last_wd.view(-1, 1), 
+                hidden_decoder_new,
+                h_attn_new, 
+                encoder_hy, 
+                hidden_attn_new, 
+                past_attn_new
+            )
         prob, wds = model.decode(logits=logits).data.topk(k=beam_size)
         prob = prob.view(batch_size, beam_size, prob.size(1), prob.size(2))
         wds = wds.view(batch_size, beam_size, wds.size(1), wds.size(2))
@@ -51,7 +59,11 @@ def fast_beam_search(
             beam_seq[:, :, 1] = wds[:, 0, 0]
             last_wd = Variable(wds[:, 0, 0].unsqueeze(2).clone()).cuda()
             
-            hidden_decoder_new = hidden_decoder
+            if network == 'lstm':
+                h0_new = h0
+                c0_new = c0
+            else:
+                hidden_decoder_new = hidden_decoder
             h_attn_new = h_attn
             hidden_attn_new = hidden_attn
             past_attn_new = past_attn
@@ -65,13 +77,23 @@ def fast_beam_search(
         cand_prob += prob[:, :, 0]
         cand_prob = cand_prob.contiguous().view(batch_size, beam_size*beam_size)
         
-        hidden_decoder_new = hidden_decoder_new.view(batch_size, beam_size, hidden_decoder_new.size(-1))
+        if network == 'lstm':
+            h0_new = h0_new.view(batch_size, beam_size, h0_new.size(-1))
+            c0_new = c0_new.view(batch_size, beam_size, c0_new.size(-1))
+        else:
+            hidden_decoder_new = hidden_decoder_new.view(batch_size, beam_size, hidden_decoder_new.size(-1))
         h_attn_new = h_attn_new.view(batch_size, beam_size, h_attn_new.size(1))
         hidden_attn_new = hidden_attn_new.view(batch_size, beam_size, hidden_attn_new.size(1))
         past_attn_new = past_attn_new.view(batch_size, beam_size, past_attn_new.size(1))
         
-        hidden_decoder = hidden_decoder.view(batch_size, beam_size, hidden_decoder.size(-1))
-        hidden_decoder = tensor_transformer(hidden_decoder, batch_size, beam_size)
+        if network == 'lstm':
+            h0 = h0.view(batch_size, beam_size, h0.size(-1))
+            h0 = tensor_transformer(h0, batch_size, beam_size)
+            c0 = c0.view(batch_size, beam_size, c0.size(-1))
+            c0 = tensor_transformer(c0, batch_size, beam_size)
+        else:
+            hidden_decoder = hidden_decoder.view(batch_size, beam_size, hidden_decoder.size(-1))
+            hidden_decoder = tensor_transformer(hidden_decoder, batch_size, beam_size)
         h_attn = h_attn.view(batch_size, beam_size, h_attn.size(1))
         h_attn = tensor_transformer(h_attn, batch_size, beam_size)
         hidden_attn = hidden_attn.view(batch_size, beam_size, hidden_attn.size(1))
@@ -86,12 +108,20 @@ def fast_beam_search(
                 beam_seq[x, b] = cand_seq[x, tmp_idx[x, b]]
                 beam_prb[x, b] = tmp_prb[x, b]
                 
-                hidden_decoder_new[x, b] = hidden_decoder[x, tmp_idx[x, b]]
+                if network == 'lstm':
+                    h0_new[x, b] = h0[x, tmp_idx[x, b]]
+                    c0_new[x, b] = c0[x, tmp_idx[x, b]]
+                else:
+                    hidden_decoder_new[x, b] = hidden_decoder[x, tmp_idx[x, b]]
                 h_attn_new[x, b] = h_attn[x, tmp_idx[x, b]]
                 hidden_attn_new[x, b] = hidden_attn[x, tmp_idx[x, b]]
                 past_attn_new[x, b] = past_attn[x, tmp_idx[x, b]]
-             
-        hidden_decoder_new = hidden_decoder_new.view(-1, hidden_decoder_new.size(-1))
+        
+        if network == 'lstm':
+            h0_new = h0_new.view(-1, h0_new.size(-1))
+            c0_new = c0_new.view(-1, c0_new.size(-1))
+        else:
+            hidden_decoder_new = hidden_decoder_new.view(-1, hidden_decoder_new.size(-1))
         h_attn_new = h_attn_new.view(-1, h_attn_new.size(-1))
         hidden_attn_new = hidden_attn_new.view(-1, hidden_attn_new.size(-1))
         past_attn_new = past_attn_new.view(-1, past_attn_new.size(-1))
