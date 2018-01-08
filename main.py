@@ -26,7 +26,7 @@ parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embeddi
 parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
 parser.add_argument('--trg_hidden_dim', type=int, default=256, help='decoder hidden dimension')
 parser.add_argument('--attn_hidden_dim', type=int, default=128, help='attn hidden dimension')
-parser.add_argument('--src_num_layers', type=int, default=2, help='encoder number layers')
+parser.add_argument('--src_num_layers', type=int, default=1, help='encoder number layers')
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
 parser.add_argument('--word_mincount', type=int, default=5, 
@@ -35,11 +35,11 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='bahdanau_concat',
+parser.add_argument('--attn_method', default='luong_concat',
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='simple',
                     help='vanilla | simple | concat | gru | asee')
-parser.add_argument('--network_', default='gru', help='gru | lstm')
+parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--attn_as_input', type=bool, default=True, help='Luong Attn Method use h_attn as input as well.')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
@@ -47,7 +47,7 @@ parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradi
 parser.add_argument('--clean_batch', type=bool, default=False, help='Do you want to clean the batch folder?')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_34_8000', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 # used in validation
@@ -323,7 +323,8 @@ if opt.task == 'fastbeam':
             src_text=src_var, 
             vocab2id=vocab2id, 
             beam_size=opt.beam_size, 
-            max_len=opt.trg_seq_lens
+            max_len=opt.trg_seq_lens,
+            network=opt.network_
         )
         trg_seq = trg_output_var.data.numpy()
         for b in range(trg_seq.shape[0]):

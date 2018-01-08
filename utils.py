@@ -16,11 +16,15 @@ def fast_beam_search(
     src_text,
     vocab2id,
     beam_size=4, 
-    max_len=20
+    max_len=20,
+    network='gru'
 ):
     batch_size = src_text.size(0)
     src_text_rep = src_text.unsqueeze(1).clone().repeat(1, beam_size, 1).view(-1, src_text.size(1)).cuda()
-    encoder_hy, hidden_decoder_new, h_attn_new, hidden_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
+    if network == 'lstm':
+        encoder_hy, (h0_new, c0_new), h_attn_new, hidden_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
+    else:
+        encoder_hy, hidden_decoder_new, h_attn_new, hidden_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
     
     beam_seq = Variable(torch.LongTensor(
         batch_size, beam_size, max_len+1).fill_(vocab2id['<pad>'])).cuda()
@@ -29,13 +33,16 @@ def fast_beam_search(
     last_wd = Variable(torch.LongTensor(batch_size, beam_size, 1).fill_(vocab2id['<s>'])).cuda()
     
     for j in range(max_len):
+        if network == 'lstm':
+            pass
         logits, hidden_decoder, h_attn, hidden_attn, past_attn = model.forward_onestep_decoder(
             last_wd.view(-1, 1), 
             hidden_decoder_new,
             h_attn_new, 
             encoder_hy, 
             hidden_attn_new, 
-            past_attn_new)
+            past_attn_new
+        )
         prob, wds = model.decode(logits=logits).data.topk(k=beam_size)
         prob = prob.view(batch_size, beam_size, prob.size(1), prob.size(2))
         wds = wds.view(batch_size, beam_size, wds.size(1), wds.size(2))
