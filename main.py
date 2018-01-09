@@ -37,7 +37,7 @@ parser.add_argument('--shared_embedding', type=bool, default=True, help='source 
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 parser.add_argument('--attn_method', default='luong_concat',
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='simple',
+parser.add_argument('--coverage', default='vanilla',
                     help='vanilla | simple | concat | gru | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--attn_as_input', type=bool, default=True, help='Luong Attn Method use h_attn as input as well.')
