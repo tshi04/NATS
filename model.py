@@ -586,8 +586,8 @@ class Seq2Seq(torch.nn.Module):
             torch.nn.init.uniform(self.src_embedding.weight, -1.0, 1.0)
 
             self.trg_embedding = torch.nn.Embedding(
-                self.src_vocab_size,
-                self.src_emb_dim,
+                self.trg_vocab_size,
+                self.trg_emb_dim,
                 padding_idx=0
             ).cuda()
             torch.nn.init.uniform(self.trg_embedding.weight, -1.0, 1.0)
