@@ -267,7 +267,6 @@ class LSTMDecoder(torch.nn.Module):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
-
         batch_size = input_.size(1)
         
         output_ = []
@@ -277,74 +276,42 @@ class LSTMDecoder(torch.nn.Module):
                 hidden_ = self.lstm_(input_[k], hidden_)
                 output_.append(hidden_[0])
         if self.attn_method[:8] == 'bahdanau':
-            if self.coverage == 'concat' or self.coverage == 'simple':
-                for k in range(input_.size(0)):
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_[0], 
-                        encoder_hy.transpose(0,1),
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = 0.5*attn + 0.5*past_attn
-                    x_input = torch.cat((input_[k], h_attn), 1)
-                    hidden_ = self.lstm_(x_input, hidden_)
-                    output_.append(hidden_[0])
-                    out_attn.append(attn)
-                    pt_input = torch.cat((input_[k], hidden_[0], h_attn), 1)
-                    p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
-            else:
-                for k in range(input_.size(0)):
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_[0], 
-                        encoder_hy.transpose(0,1),
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = past_attn + attn
-                    x_input = torch.cat((input_[k], h_attn), 1)
-                    hidden_ = self.lstm_(x_input, hidden_)
-                    output_.append(hidden_[0])
-                    out_attn.append(attn)
+            for k in range(input_.size(0)):
+                h_attn, attn, hidden_attn = self.attn_layer(
+                    hidden_[0], 
+                    encoder_hy.transpose(0,1),
+                    past_attn=past_attn,
+                    hidden_attn=hidden_attn
+                )
+                past_attn = past_attn + attn
+                past_attn = F.softmax(past_attn, dim=1)
+                x_input = torch.cat((input_[k], h_attn), 1)
+                hidden_ = self.lstm_(x_input, hidden_)
+                output_.append(hidden_[0])
+                out_attn.append(attn)
+                if self.pointer_net:
                     pt_input = torch.cat((input_[k], hidden_[0], h_attn), 1)
                     p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
         if self.attn_method[:5] == 'luong':
             # luong need init h_attn
-            if self.coverage == 'concat' or self.coverage == 'simple':
-                batch_size = input_.size(1)
-                for k in range(input_.size(0)):
-                    if self.attn_as_input:
-                        x_input = torch.cat((input_[k], h_attn), 1)
-                    else:
-                        x_input = input_[k]
-                    hidden_ = self.lstm_(x_input, hidden_)
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_[0], 
-                        encoder_hy.transpose(0,1), 
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = 0.5*attn + 0.5*past_attn
-                    output_.append(h_attn)
-                    out_attn.append(attn)
-                    pt_input = torch.cat((input_[k], hidden_[0], h_attn), 1)
-                    p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
-            else:
-                batch_size = input_.size(1)
-                for k in range(input_.size(0)):
-                    if self.attn_as_input:
-                        x_input = torch.cat((input_[k], h_attn), 1)
-                    else:
-                        x_input = input_[k]
-                    hidden_ = self.lstm_(x_input, hidden_)
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_[0], 
-                        encoder_hy.transpose(0,1), 
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = past_attn + attn
-                    output_.append(h_attn)
-                    out_attn.append(attn)
+            batch_size = input_.size(1)
+            for k in range(input_.size(0)):
+                if self.attn_as_input:
+                    x_input = torch.cat((input_[k], h_attn), 1)
+                else:
+                    x_input = input_[k]
+                hidden_ = self.lstm_(x_input, hidden_)
+                h_attn, attn, hidden_attn = self.attn_layer(
+                    hidden_[0], 
+                    encoder_hy.transpose(0,1), 
+                    past_attn=past_attn,
+                    hidden_attn=hidden_attn
+                )
+                past_attn = past_attn + attn
+                past_attn = F.softmax(past_attn, dim=1)
+                output_.append(h_attn)
+                out_attn.append(attn)
+                if self.pointer_net:
                     pt_input = torch.cat((input_[k], hidden_[0], h_attn), 1)
                     p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
                     
@@ -455,73 +422,41 @@ class GRUDecoder(torch.nn.Module):
                 hidden_ = self.gru_(input_[k], hidden_)
                 output_.append(hidden_)
         if self.attn_method[:8] == 'bahdanau':
-            if self.coverage == 'concat' or self.coverage == 'simple':
-                for k in range(input_.size(0)):
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_,
-                        encoder_hy.transpose(0,1),
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = 0.5*attn + 0.5*past_attn
-                    x_input = torch.cat((input_[k], h_attn), 1)
-                    hidden_ = self.gru_(x_input, hidden_)
-                    output_.append(hidden_)
-                    out_attn.append(attn)
-                    pt_input = torch.cat((input_[k], hidden_, h_attn), 1)
-                    p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
-            else:
-                for k in range(input_.size(0)):
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_, 
-                        encoder_hy.transpose(0,1),
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = past_attn + attn
-                    x_input = torch.cat((input_[k], h_attn), 1)
-                    hidden_ = self.gru_(x_input, hidden_)
-                    output_.append(hidden_)
-                    out_attn.append(attn)
+            for k in range(input_.size(0)):
+                h_attn, attn, hidden_attn = self.attn_layer(
+                    hidden_, 
+                    encoder_hy.transpose(0,1),
+                    past_attn=past_attn,
+                    hidden_attn=hidden_attn
+                )
+                past_attn = past_attn + attn
+                past_attn = F.softmax(past_attn, dim=1)
+                x_input = torch.cat((input_[k], h_attn), 1)
+                hidden_ = self.gru_(x_input, hidden_)
+                output_.append(hidden_)
+                out_attn.append(attn)
+                if self.pointer_net:
                     pt_input = torch.cat((input_[k], hidden_, h_attn), 1)
                     p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
         if self.attn_method[:5] == 'luong':
-            if self.coverage == 'concat' or self.coverage == 'simple':
-                batch_size = input_.size(1)
-                for k in range(input_.size(0)):
-                    if self.attn_as_input:
-                        x_input = torch.cat((input_[k], h_attn), 1)
-                    else:
-                        x_input = input_[k]
-                    hidden_ = self.gru_(x_input, hidden_)
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_, 
-                        encoder_hy.transpose(0,1),
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = 0.5*attn + 0.5*past_attn
-                    output_.append(h_attn)
-                    out_attn.append(attn)
-                    pt_input = torch.cat((input_[k], hidden_, h_attn), 1)
-                    p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
-            else:
-                batch_size = input_.size(1)
-                for k in range(input_.size(0)):
-                    if self.attn_as_input:
-                        x_input = torch.cat((input_[k], h_attn), 1)
-                    else:
-                        x_input = input_[k]
-                    hidden_ = self.gru_(x_input, hidden_)
-                    h_attn, attn, hidden_attn = self.attn_layer(
-                        hidden_, 
-                        encoder_hy.transpose(0,1),
-                        past_attn=past_attn,
-                        hidden_attn=hidden_attn
-                    )
-                    past_attn = past_attn + attn
-                    output_.append(h_attn)
-                    out_attn.append(attn)
+            batch_size = input_.size(1)
+            for k in range(input_.size(0)):
+                if self.attn_as_input:
+                    x_input = torch.cat((input_[k], h_attn), 1)
+                else:
+                    x_input = input_[k]
+                hidden_ = self.gru_(x_input, hidden_)
+                h_attn, attn, hidden_attn = self.attn_layer(
+                    hidden_, 
+                    encoder_hy.transpose(0,1),
+                    past_attn=past_attn,
+                    hidden_attn=hidden_attn
+                )
+                past_attn = past_attn + attn
+                past_attn = F.softmax(past_attn, dim=1)
+                output_.append(h_attn)
+                out_attn.append(attn)
+                if self.pointer_net:
                     pt_input = torch.cat((input_[k], hidden_, h_attn), 1)
                     p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
             
@@ -793,8 +728,6 @@ class Seq2Seq(torch.nn.Module):
             batch_size, self.src_seq_len)).cuda()
         h_attn = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
-        p_gen = Variable(torch.zeros(
-            batch_size, self.trg_seq_len)).cuda()
 
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
@@ -819,7 +752,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
             
-            return encoder_hy, (decoder_h0, decoder_c0), h_attn, hidden_attn, past_attn, p_gen
+            return encoder_hy, (decoder_h0, decoder_c0), h_attn, hidden_attn, past_attn
         
         elif self.network_ == 'gru':
             src_h, src_h_t = self.encoder(
@@ -844,18 +777,19 @@ class Seq2Seq(torch.nn.Module):
         h_attn,
         encoder_hy,
         hidden_attn,
-        past_attn,
-        p_gen
+        past_attn
     ):
         if self.shared_emb:
             trg_emb = self.embedding(input_trg)
         else:
             trg_emb = self.trg_embedding(input_trg)
-            
+
         batch_size = input_trg.size(1)
         if self.batch_first:
             batch_size = input_trg.size(0)
 
+        p_gen = Variable(torch.zeros(batch_size, 1)).cuda()
+        
         if self.network_ == 'lstm':
             trg_h, hidden_decoder, h_attn, attn_, hidden_attn, past_attn, p_gen = self.decoder(
                 trg_emb,
@@ -885,16 +819,7 @@ class Seq2Seq(torch.nn.Module):
         decoder_output = decoder_output.view(
             trg_h.size(0), trg_h.size(1), decoder_output.size(1))
 
-        return decoder_output, hidden_decoder, h_attn, hidden_attn, past_attn, p_gen
-    
-    def decode(self, logits):
-        # here consume a lot of memory.
-        word_probs = F.softmax(
-            logits.view(-1, logits.size(2)), dim=1)
-        word_probs = word_probs.view(
-            logits.size(0), logits.size(1), logits.size(2))
-
-        return word_probs
+        return decoder_output, hidden_decoder, h_attn, hidden_attn, past_attn, p_gen, attn_
 
     def cal_dist(self, input_src, logits, attn_, p_gen):
     
@@ -909,6 +834,6 @@ class Seq2Seq(torch.nn.Module):
         pt_idx = Variable(torch.FloatTensor(torch.zeros(1, 1, 1))).cuda()
         pt_idx = pt_idx.repeat(batch_size, src_seq_len, vocab_size)
         pt_idx.scatter_(2, input_src.unsqueeze(2), 1.0)
-        
+
         return p_gen.unsqueeze(2)*logits + (1.0-p_gen.unsqueeze(2))*torch.bmm(attn_, pt_idx)
     

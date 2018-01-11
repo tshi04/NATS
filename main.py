@@ -14,12 +14,12 @@ from utils import *
 from data_utils import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--task', default='train', help='train | test | validate | rouge | fastbeam | model2para')
+parser.add_argument('--task', default='train', help='train | validate | rouge | fastbeam')
 parser.add_argument('--data_dir', default='../sum_data/', help='directory that store the data.')
 parser.add_argument('--file_vocab', default='vocab', help='file store training vocabulary.')
 parser.add_argument('--file_corpus', default='train.txt', help='file store training documents.')
 parser.add_argument('--n_epoch', type=int, default=35, help='number of epochs.')
-parser.add_argument('--batch_size', type=int, default=32, help='batch size.')
+parser.add_argument('--batch_size', type=int, default=16, help='batch size.')
 parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
 parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
 parser.add_argument('--src_emb_dim', type=int, default=128, help='source embedding dimension')
@@ -30,8 +30,7 @@ parser.add_argument('--attn_hidden_dim', type=int, default=128, help='attn hidde
 parser.add_argument('--src_num_layers', type=int, default=1, help='encoder number layers')
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
-parser.add_argument('--word_mincount', type=int, default=5, 
-                    help='min count of the words in the corpus in the vocab')
+parser.add_argument('--word_mincount', type=int, default=5, help='min word frequency')
 parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder bidirectional?')
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
@@ -76,7 +75,7 @@ elif opt.task == 'test' or opt.task == 'fastbeam':
         fkey_='test',
         file_=opt.file_test,
         batch_size=opt.batch_size,
-        clean=False
+        clean=opt.clean_batch
     )
     print 'The number of batches (test): {0}'.format(test_batch)
 
@@ -133,10 +132,13 @@ if opt.task == 'train':
             logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
             if opt.pointer_net:
                 logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen)
-                logits = torch.log(logits)
             else:
-                logits = F.log_softmax(logits, dim=2)
-
+                logits = F.softmax(logits, dim=2)
+            
+            if batch_id%100 == 0:
+                word_prob = logits.data.cpu().numpy().argmax(axis=2)
+                
+            logits = torch.log(logits)
             loss = loss_criterion(
                 logits.contiguous().view(-1, len(vocab2id)),
                 trg_output_var.view(-1).cuda()
@@ -153,12 +155,11 @@ if opt.task == 'train':
             if batch_id%2000 == 0:
                 loss_np = np.array(losses)
                 np.save(out_dir+'/loss', loss_np)
-                fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
-                torch.save(model, fmodel)
+                fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'w')
+                torch.save(model.state_dict(), fmodel)
                 fmodel.close()
             if batch_id%100 == 0:
                 end_time = time.time()
-                word_prob = model.decode(logits).data.cpu().numpy().argmax(axis=2)
                 sen_pred = [id2vocab[x] for x in word_prob[0]]
                 print 'epoch={0} batch={1} loss={2}, time_escape={3}s={4}h'.format(
                     epoch, batch_id, loss.data.cpu().numpy()[0], 
@@ -173,7 +174,7 @@ if opt.task == 'train':
         loss_np = np.array(losses)
         np.save(out_dir+'/loss', loss_np)
         fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
-        torch.save(model, fmodel)
+        torch.save(model.state_dict(), fmodel)
         fmodel.close()
             
     if opt.debug:
@@ -187,13 +188,13 @@ if opt.task == 'validate':
         fkey_='validate',
         file_=opt.file_val,
         batch_size=opt.batch_size,
-        clean=False
+        clean=opt.clean_batch
     )
     print 'The number of batches (test): {0}'.format(val_batch)
     
     weight_mask = torch.ones(len(vocab2id)).cuda()
     weight_mask[vocab2id['<pad>']] = 0
-    loss_criterion = torch.nn.CrossEntropyLoss(weight=weight_mask).cuda()
+    loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
     
     model_para_files = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.model'))
     model_para_files = sorted(model_para_files)
@@ -209,11 +210,18 @@ if opt.task == 'validate':
                 batch_size=opt.batch_size, vocab2id=vocab2id, 
                 max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
             )
-            logits, _ = model(src_var.cuda(), trg_input_var.cuda())
+            logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
+            if opt.pointer_net:
+                logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen)
+            else:
+                logits = F.softmax(logits, dim=2)
+
+            logits = torch.log(logits)
             loss = loss_criterion(
                 logits.contiguous().view(-1, len(vocab2id)),
                 trg_output_var.view(-1).cuda()
             )
+            
             losses.append(loss.data.cpu().numpy()[0])
             print batch_id,
         print
@@ -222,6 +230,44 @@ if opt.task == 'validate':
         itm = [fl_, str(np.average(losses)), str(end_time-start_time)]
         print ' '.join(itm)
         fout.write(' '.join(itm)+'\n')
+    fout.close()
+'''
+fastbeam
+'''
+if opt.task == 'fastbeam':
+    model.load_state_dict(torch.load(
+        os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
+    
+    start_time = time.time()
+    fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
+    for batch_id in range(test_batch):
+        src_var, trg_input_var, trg_output_var = process_minibatch(
+            batch_id=batch_id, path_=opt.data_dir, fkey_='test', 
+            batch_size=opt.batch_size, vocab2id=vocab2id, 
+            max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
+        )
+        beam_seq, beam_prb = fast_beam_search(
+            model=model, 
+            src_text=src_var, 
+            vocab2id=vocab2id, 
+            beam_size=opt.beam_size, 
+            max_len=opt.trg_seq_lens,
+            network=opt.network_,
+            pointer_net=opt.pointer_net
+        )
+        trg_seq = trg_output_var.data.numpy()
+        for b in range(trg_seq.shape[0]):
+            arr = []
+            gen_text = beam_seq.data.cpu().numpy()[b,0]
+            gen_text = [id2vocab[wd] for wd in gen_text]
+            arr.append(' '.join(gen_text))
+            trg_text = [id2vocab[wd] for wd in trg_seq[b]]
+            arr.append(' '.join(trg_text))
+            fout.write('<sec>'.join(arr)+'\n')
+
+        end_time = time.time()
+        print(batch_id, end_time-start_time)
+    
     fout.close()
 '''
 rouge
@@ -265,86 +311,3 @@ if opt.task == 'rouge':
         fout.close()
         cnt += 1
     fp.close()
-'''
-model2para
-'''
-if opt.task == 'model2para':
-    models_ = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.pt'))
-    for file_ in models_:
-        out_file = re.split('.pt', file_)[0]
-        model = torch.load(file_)
-        torch.save(model.state_dict(), out_file+'.model')
-        print '{0}->{1}'.format(file_, out_file)
-'''
-test
-'''
-if opt.task == 'test':
-    model.load_state_dict(torch.load(
-        os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
-
-    start_time = time.time()
-    fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
-    for batch_id in range(test_batch):
-        src_var, trg_input_var, trg_output_var = process_minibatch(
-            batch_id=batch_id, path_=opt.data_dir, fkey_='test', 
-            batch_size=opt.batch_size, vocab2id=vocab2id, 
-            max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
-        )
-        beam_seq, beam_prb = batch_beam_search(
-            model=model, 
-            src_text=src_var, 
-            vocab2id=vocab2id, 
-            beam_size=opt.beam_size, 
-            max_len=opt.trg_seq_lens
-        )
-        trg_seq = trg_output_var.data.numpy()
-        for b in range(trg_seq.shape[0]):
-            arr = []
-            gen_text = beam_seq.data.cpu().numpy()[b,0]
-            gen_text = [id2vocab[wd] for wd in gen_text]
-            arr.append(' '.join(gen_text))
-            trg_text = [id2vocab[wd] for wd in trg_seq[b]]
-            arr.append(' '.join(trg_text))
-            fout.write('<sec>'.join(arr)+'\n')
-
-        end_time = time.time()
-        print(batch_id, end_time-start_time)
-    
-    fout.close()
-'''
-fastbeam
-'''
-if opt.task == 'fastbeam':
-    model.load_state_dict(torch.load(
-        os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
-    
-    start_time = time.time()
-    fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
-    for batch_id in range(test_batch):
-        src_var, trg_input_var, trg_output_var = process_minibatch(
-            batch_id=batch_id, path_=opt.data_dir, fkey_='test', 
-            batch_size=opt.batch_size, vocab2id=vocab2id, 
-            max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
-        )
-        beam_seq, beam_prb = fast_beam_search(
-            model=model, 
-            src_text=src_var, 
-            vocab2id=vocab2id, 
-            beam_size=opt.beam_size, 
-            max_len=opt.trg_seq_lens,
-            network=opt.network_
-        )
-        trg_seq = trg_output_var.data.numpy()
-        for b in range(trg_seq.shape[0]):
-            arr = []
-            gen_text = beam_seq.data.cpu().numpy()[b,0]
-            gen_text = [id2vocab[wd] for wd in gen_text]
-            arr.append(' '.join(gen_text))
-            trg_text = [id2vocab[wd] for wd in trg_seq[b]]
-            arr.append(' '.join(trg_text))
-            fout.write('<sec>'.join(arr)+'\n')
-
-        end_time = time.time()
-        print(batch_id, end_time-start_time)
-    
-    fout.close()
