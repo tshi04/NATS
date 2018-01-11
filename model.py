@@ -204,7 +204,8 @@ class LSTMDecoder(torch.nn.Module):
         attn_method,
         coverage,
         attn_as_input,
-        batch_first
+        batch_first,
+        pointer_net
     ):
         super(LSTMDecoder, self).__init__()
         # parameters
@@ -217,7 +218,8 @@ class LSTMDecoder(torch.nn.Module):
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
-        self.attn_as_input=attn_as_input
+        self.attn_as_input = attn_as_input
+        self.pointer_net = pointer_net
         
         if self.attn_method == 'vanilla':
             self.lstm_ = torch.nn.LSTMCell(
@@ -367,7 +369,8 @@ class GRUDecoder(torch.nn.Module):
         attn_method,
         coverage,
         attn_as_input,
-        batch_first
+        batch_first,
+        pointer_net
     ):
         super(GRUDecoder, self).__init__()
         # parameters
@@ -380,7 +383,8 @@ class GRUDecoder(torch.nn.Module):
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
-        self.attn_as_input=attn_as_input
+        self.attn_as_input = attn_as_input
+        self.pointer_net = pointer_net
         
         if self.attn_method == 'vanilla':
             self.gru_ = torch.nn.GRUCell(
@@ -538,6 +542,7 @@ class Seq2Seq(torch.nn.Module):
         attn_method='vanilla',
         coverage='vanilla',
         network_='gru',
+        pointer_net=True,
         attn_as_input=True, # For Luong's method only
         shared_emb=True
     ):
@@ -560,8 +565,9 @@ class Seq2Seq(torch.nn.Module):
         self.attn_method = attn_method.lower()
         self.coverage = coverage.lower()
         self.network_ = network_.lower()
-        self.shared_emb=shared_emb
-        self.attn_as_input=attn_as_input
+        self.pointer_net = pointer_net
+        self.shared_emb = shared_emb
+        self.attn_as_input = attn_as_input
         
         self.src_num_directions = 1
         if self.src_bidirect:
@@ -613,7 +619,8 @@ class Seq2Seq(torch.nn.Module):
                 attn_method=self.attn_method,
                 coverage=self.coverage,
                 attn_as_input=self.attn_as_input,
-                batch_first=self.batch_first
+                batch_first=self.batch_first,
+                pointer_net=self.pointer_net
             ).cuda()
         elif self.network_ == 'gru':
             # encoder
@@ -636,7 +643,8 @@ class Seq2Seq(torch.nn.Module):
                 attn_method=self.attn_method,
                 coverage=self.coverage,
                 attn_as_input=self.attn_as_input,
-                batch_first=self.batch_first
+                batch_first=self.batch_first,
+                pointer_net=self.pointer_net
             ).cuda()
         # encoder to decoder
         self.encoder2decoder = torch.nn.Linear(
@@ -681,7 +689,7 @@ class Seq2Seq(torch.nn.Module):
         h_attn = Variable(
             torch.FloatTensor(torch.zeros(batch_size, self.trg_hidden_dim))
         ).cuda()
-
+        
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
                 self.encoder.num_layers*self.src_num_directions,
@@ -886,4 +894,20 @@ class Seq2Seq(torch.nn.Module):
         )
 
         return word_probs
+
+    def cal_dist(self, input_src, logits, attn_):
+    
+        src_seq_len = input_src.size(1)
+        trg_seq_len = logits.size(1)
+        batch_size = input_src.size(0)
+        vocab_size = logits.size(2)
+
+        logits = F.softmax(logits, dim=2)
+        attn_ = attn_.transpose(0, 1)
+        
+        pt_idx = Variable(torch.zeros(1, 1, 1)).cuda()
+        pt_idx = pt_idx.repeat(batch_size, src_seq_len, vocab_size)
+        pt_idx.scatter_(2, input_src.unsqueeze(2), 1.0)
+        
+        return torch.log(0.5*logits + 0.5*torch.bmm(attn_, pt_idx))
     

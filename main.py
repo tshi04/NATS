@@ -6,6 +6,7 @@ import glob
 import time
 
 import torch
+import torch.nn.functional as F
 from torch.autograd import Variable
 
 from model import *
@@ -37,10 +38,10 @@ parser.add_argument('--shared_embedding', type=bool, default=True, help='source 
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 parser.add_argument('--attn_method', default='luong_concat',
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='vanilla',
-                    help='vanilla | simple | concat | gru | asee')
+parser.add_argument('--coverage', default='vanilla', help='vanilla | simple | concat | gru | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
-parser.add_argument('--attn_as_input', type=bool, default=True, help='Luong Attn Method use h_attn as input as well.')
+parser.add_argument('--attn_as_input', type=bool, default=True, help='(Luong) use h_attn as input as well.')
+parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
@@ -98,6 +99,7 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or op
         attn_method=opt.attn_method,
         coverage=opt.coverage,
         network_=opt.network_,
+        pointer_net=opt.pointer_net,
         attn_as_input=opt.attn_as_input,
         shared_emb=opt.shared_embedding
     ).cuda()
@@ -108,7 +110,7 @@ train
 if opt.task == 'train':
     weight_mask = torch.ones(len(vocab2id)).cuda()
     weight_mask[vocab2id['<pad>']] = 0
-    loss_criterion = torch.nn.CrossEntropyLoss(weight=weight_mask).cuda()
+    loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.learning_rate)
 
@@ -128,13 +130,18 @@ if opt.task == 'train':
                 batch_size=opt.batch_size, vocab2id=vocab2id, 
                 max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
             )
-            logits, _ = model(src_var.cuda(), trg_input_var.cuda())
-            optimizer.zero_grad()
-        
+            logits, attn_ = model(src_var.cuda(), trg_input_var.cuda())
+            if opt.pointer_net:
+                logits = model.cal_dist(src_var.cuda(), logits, attn_)
+            else:
+                logits = F.log_softmax(logits, dim=2)
+
             loss = loss_criterion(
                 logits.contiguous().view(-1, len(vocab2id)),
                 trg_output_var.view(-1).cuda()
             )
+
+            optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 

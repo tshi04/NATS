@@ -8,3 +8,8 @@ Summarization with coverage for a research paper.
 - https://github.com/OpenNMT/OpenNMT
 - https://github.com/spro/practical-pytorch
 
+### Note
+
+When using the package,
+python main.py --pointer_net False
+will not work. Anything related with bool type gives error. It always gives True.
