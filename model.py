@@ -628,7 +628,7 @@ class Seq2Seq(torch.nn.Module):
         else:
             src_emb = self.src_embedding(input_src)
             trg_emb = self.trg_embedding(input_trg)
-            
+
         batch_size = input_src.size(1)
         if self.batch_first:
             batch_size = input_src.size(0)
