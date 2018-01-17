@@ -146,9 +146,8 @@ if opt.task == 'train':
 
             optimizer.zero_grad()
             loss.backward()
+            #torch.nn.utils.clip_grad_norm(model.parameters(), opt.grad_clip)
             optimizer.step()
-
-            torch.nn.utils.clip_grad_norm(model.parameters(), opt.grad_clip)
         
             end_time = time.time()
             losses.append([epoch, batch_id, loss.data.cpu().numpy()[0], (end_time-start_time)/3600.0])
