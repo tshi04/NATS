@@ -63,13 +63,14 @@ def create_batch_file(path_, fkey_, file_, batch_size, clean=False):
             arr = []
             cnt += 1
     
-    fout = open(os.path.join(folder, str(cnt)), 'w')
-    for itm in arr:
-        fout.write(itm)
-    fout.close()
-    arr = []
-    cnt += 1
-    fp.close()
+    if len(arr) > 0:
+        fout = open(os.path.join(folder, str(cnt)), 'w')
+        for itm in arr:
+            fout.write(itm)
+        fout.close()
+        arr = []
+        cnt += 1
+        fp.close()
     
     return cnt
 '''

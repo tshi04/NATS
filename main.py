@@ -46,6 +46,7 @@ parser.add_argument('--debug', type=bool, default=False, help='if true will clea
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
 parser.add_argument('--clean_batch', type=bool, default=False, help='Do you want to clean the batch folder?')
 parser.add_argument('--checkpoint', type=int, default=500, help='How often you want to save model?')
+parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
 parser.add_argument('--nbestmodel', type=int, default=10, help='How many models you want to keep?')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
@@ -115,17 +116,36 @@ if opt.task == 'train':
 
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.learning_rate)
 
-    lead_dir = opt.data_dir+'/seq2seq_results-'
-    for k in range(1000000):
-        out_dir = lead_dir+str(k)
+    if opt.continue_training:
+        out_dir = os.path.join(opt.data_dir, opt.model_dir)
         if not os.path.exists(out_dir):
-            break
-    os.mkdir(out_dir)
+            os.mkdir(out_dir)
+        model_para_files = glob.glob(os.path.join(out_dir, '*.model'))
+        uf_model = []
+        for fl_ in model_para_files:
+            arr = re.split('\/', fl_)[-1]
+            arr = re.split('\_|\.', arr)
+            uf_model.append([int(arr[1]), int(arr[2])])
+        uf_model = sorted(uf_model)[-1]
+        fl_ = os.path.join(out_dir, 'seq2seq_'+str(uf_model[0])+'_'+str(uf_model[1])+'.model')
+        model.load_state_dict(torch.load(fl_))
+    else:
+        lead_dir = opt.data_dir+'/seq2seq_results-'
+        for k in range(1000000):
+            out_dir = lead_dir+str(k)
+            if not os.path.exists(out_dir):
+                break
+        os.mkdir(out_dir)
 
     losses = []
     start_time = time.time()
-    for epoch in range(opt.n_epoch):
+    cclb = 0
+    for epoch in range(uf_model[0], opt.n_epoch):
         for batch_id in range(n_batch):
+            if cclb == 0 and batch_id <= uf_model[1]:
+                continue
+            else:
+                cclb += 1
             src_var, trg_input_var, trg_output_var = process_minibatch(
                 batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
                 batch_size=opt.batch_size, vocab2id=vocab2id, 
@@ -159,7 +179,7 @@ if opt.task == 'train':
                 fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'w')
                 torch.save(model.state_dict(), fmodel)
                 fmodel.close()
-            if batch_id%opt.checkpoint == 0:
+            if batch_id%100 == 0:
                 end_time = time.time()
                 sen_pred = [id2vocab[x] for x in word_prob[0]]
                 print 'epoch={0} batch={1} loss={2}, time_escape={3}s={4}h'.format(
