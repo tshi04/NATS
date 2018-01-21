@@ -45,6 +45,7 @@ parser.add_argument('--learning_rate', type=float, default=0.0001, help='learnin
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
 parser.add_argument('--clean_batch', type=bool, default=False, help='Do you want to clean the batch folder?')
+parser.add_argument('--checkpoint', type=float, default=100, help='How often you want to save model?')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
 parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
@@ -151,13 +152,13 @@ if opt.task == 'train':
         
             end_time = time.time()
             losses.append([epoch, batch_id, loss.data.cpu().numpy()[0], (end_time-start_time)/3600.0])
-            if batch_id%2000 == 0:
+            if batch_id%opt.checkpoint == 0:
                 loss_np = np.array(losses)
                 np.save(out_dir+'/loss', loss_np)
                 fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'w')
                 torch.save(model.state_dict(), fmodel)
                 fmodel.close()
-            if batch_id%100 == 0:
+            if batch_id%opt.checkpoint == 0:
                 end_time = time.time()
                 sen_pred = [id2vocab[x] for x in word_prob[0]]
                 print 'epoch={0} batch={1} loss={2}, time_escape={3}s={4}h'.format(

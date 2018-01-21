@@ -13,3 +13,7 @@ Summarization with coverage for a research paper.
 When using the package,
 python main.py --pointer_net False
 will not work. Anything related with bool type gives error. It always gives True.
+
+
+It is highly recommended to make changes to the default value of main.py and run
+python main.py
