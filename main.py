@@ -45,7 +45,8 @@ parser.add_argument('--learning_rate', type=float, default=0.0001, help='learnin
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
 parser.add_argument('--clean_batch', type=bool, default=False, help='Do you want to clean the batch folder?')
-parser.add_argument('--checkpoint', type=float, default=100, help='How often you want to save model?')
+parser.add_argument('--checkpoint', type=int, default=100, help='How often you want to save model?')
+parser.add_argument('--nbestmodel', type=int, default=10, help='How many models you want to keep?')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
 parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
@@ -196,41 +197,69 @@ if opt.task == 'validate':
     weight_mask[vocab2id['<pad>']] = 0
     loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
     
-    model_para_files = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.model'))
-    model_para_files = sorted(model_para_files)
+    best_arr = []
+    val_file = os.path.join(opt.data_dir, opt.model_dir, 'model_validate.txt')
+    if os.path.exists(val_file):
+        fp = open(val_file, 'r')
+        for line in fp:
+            arr = re.split('\s', line[:-1])
+            best_arr.append([arr[0], float(arr[1]), float(arr[2])])
+        fp.close()
 
-    start_time = time.time()
-    fout = open(os.path.join(opt.data_dir, 'model_validate.txt'), 'w')
-    for fl_ in model_para_files:
-        losses = []
-        model.load_state_dict(torch.load(os.path.join(fl_)))
-        for batch_id in range(val_batch):
-            src_var, trg_input_var, trg_output_var = process_minibatch(
-                batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
-                batch_size=opt.batch_size, vocab2id=vocab2id, 
-                max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
-            )
-            logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
-            if opt.pointer_net:
-                logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen)
-            else:
-                logits = F.softmax(logits, dim=2)
+    while 1:
+        model_para_files = []
+        model_para_files = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.model'))
+        model_para_files = sorted(model_para_files)
+        
+        for fl_ in model_para_files:
+            best_model = {itm[0]: itm[1] for itm in best_arr}
+            if fl_ in best_model:
+                continue
+            losses = []
+            start_time = time.time()
+            try:
+                model.load_state_dict(torch.load(fl_))
+            except:
+                continue
+            for batch_id in range(val_batch):
+                src_var, trg_input_var, trg_output_var = process_minibatch(
+                    batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
+                    batch_size=opt.batch_size, vocab2id=vocab2id, 
+                    max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
+                )
+                logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
+                if opt.pointer_net:
+                    logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen)
+                else:
+                    logits = F.softmax(logits, dim=2)
 
-            logits = torch.log(logits)
-            loss = loss_criterion(
-                logits.contiguous().view(-1, len(vocab2id)),
-                trg_output_var.view(-1).cuda()
-            )
+                logits = torch.log(logits)
+                loss = loss_criterion(
+                    logits.contiguous().view(-1, len(vocab2id)),
+                    trg_output_var.view(-1).cuda()
+                )
             
-            losses.append(loss.data.cpu().numpy()[0])
-            print batch_id,
-        print
-        losses = np.array(losses)
-        end_time = time.time()
-        itm = [fl_, str(np.average(losses)), str(end_time-start_time)]
-        print ' '.join(itm)
-        fout.write(' '.join(itm)+'\n')
-    fout.close()
+                losses.append(loss.data.cpu().numpy()[0])
+                print batch_id,
+            print
+            losses = np.array(losses)
+            end_time = time.time()
+            best_arr.append([fl_, np.average(losses), end_time-start_time])
+            for itm in best_arr:
+                print 'model={0}, loss={1}, time={2}'.format(itm[0], itm[1], itm[2])
+            
+            best_arr = sorted(best_arr, key=lambda bb: bb[1])
+            for itm in best_arr[opt.nbestmodel:]:
+                os.unlink(itm[0])
+            best_arr = best_arr[:opt.nbestmodel]
+            fout = open(val_file, 'w')
+            for itm in best_arr:
+                if len(itm) == 0:
+                    continue
+                itm[1] = str(itm[1])
+                itm[2] = str(itm[2])
+                fout.write(' '.join(itm)+'\n')
+            fout.close()
 '''
 fastbeam
 '''
