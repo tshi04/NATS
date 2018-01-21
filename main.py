@@ -260,7 +260,8 @@ if opt.task == 'validate':
                 )
             
                 losses.append(loss.data.cpu().numpy()[0])
-                print batch_id,
+                if batch_id%100 == 0:
+                    print batch_id,
             print
             losses = np.array(losses)
             end_time = time.time()
