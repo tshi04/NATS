@@ -194,7 +194,7 @@ if opt.task == 'train':
         
         loss_np = np.array(losses)
         np.save(out_dir+'/loss', loss_np)
-        fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.pt'), 'w')
+        fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'w')
         torch.save(model.state_dict(), fmodel)
         fmodel.close()
             
