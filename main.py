@@ -271,7 +271,10 @@ if opt.task == 'validate':
             
             best_arr = sorted(best_arr, key=lambda bb: bb[1])
             for itm in best_arr[opt.nbestmodel:]:
-                os.unlink(itm[0])
+                try:
+                    os.unlink(itm[0])
+                except:
+                    continue
             best_arr = best_arr[:opt.nbestmodel]
             fout = open(val_file, 'w')
             for itm in best_arr:
