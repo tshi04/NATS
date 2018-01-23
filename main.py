@@ -237,9 +237,9 @@ if opt.task == 'validate':
                 continue
             losses = []
             start_time = time.time()
-            try:
+            if os.path.exists(fl_):
                 model.load_state_dict(torch.load(fl_))
-            except:
+            else:
                 continue
             for batch_id in range(val_batch):
                 src_var, trg_input_var, trg_output_var = process_minibatch(
@@ -271,10 +271,8 @@ if opt.task == 'validate':
             
             best_arr = sorted(best_arr, key=lambda bb: bb[1])
             for itm in best_arr[opt.nbestmodel:]:
-                try:
+                if os.path.exists(itm[0]):
                     os.unlink(itm[0])
-                except:
-                    continue
             best_arr = best_arr[:opt.nbestmodel]
             fout = open(val_file, 'w')
             for itm in best_arr:
