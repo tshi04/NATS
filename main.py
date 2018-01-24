@@ -238,6 +238,7 @@ if opt.task == 'validate':
             losses = []
             start_time = time.time()
             if os.path.exists(fl_):
+                time.sleep(10)
                 model.load_state_dict(torch.load(fl_))
             else:
                 continue
