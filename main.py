@@ -63,16 +63,7 @@ vocab2id, id2vocab = construct_vocab(
     mincount=opt.word_mincount
 )
 print 'The vocabulary size: {0}'.format(len(vocab2id))
-if opt.task == 'train':
-    n_batch = create_batch_file(
-        path_=opt.data_dir,
-        fkey_='train',
-        file_=opt.file_corpus,
-        batch_size=opt.batch_size,
-        clean=opt.clean_batch
-    )
-    print 'The number of batches: {0}'.format(n_batch)
-elif opt.task == 'test' or opt.task == 'fastbeam':
+if opt.task == 'test' or opt.task == 'fastbeam':
     test_batch = create_batch_file(
         path_=opt.data_dir,
         fkey_='test',
@@ -110,6 +101,15 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or op
 train
 '''
 if opt.task == 'train':
+    n_batch = create_batch_file(
+        path_=opt.data_dir,
+        fkey_='train',
+        file_=opt.file_corpus,
+        batch_size=opt.batch_size,
+        clean=opt.clean_batch
+    )
+    print 'The number of batches: {0}'.format(n_batch)
+    
     weight_mask = torch.ones(len(vocab2id)).cuda()
     weight_mask[vocab2id['<pad>']] = 0
     loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
