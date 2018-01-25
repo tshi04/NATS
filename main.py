@@ -116,19 +116,21 @@ if opt.task == 'train':
 
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.learning_rate)
 
+    uf_model = [0, -1]
     if opt.continue_training:
         out_dir = os.path.join(opt.data_dir, opt.model_dir)
         if not os.path.exists(out_dir):
             os.mkdir(out_dir)
         model_para_files = glob.glob(os.path.join(out_dir, '*.model'))
-        uf_model = []
-        for fl_ in model_para_files:
-            arr = re.split('\/', fl_)[-1]
-            arr = re.split('\_|\.', arr)
-            uf_model.append([int(arr[1]), int(arr[2])])
-        uf_model = sorted(uf_model)[-1]
-        fl_ = os.path.join(out_dir, 'seq2seq_'+str(uf_model[0])+'_'+str(uf_model[1])+'.model')
-        model.load_state_dict(torch.load(fl_))
+        if len(model_para_files) > 0:
+            uf_model = []
+            for fl_ in model_para_files:
+                arr = re.split('\/', fl_)[-1]
+                arr = re.split('\_|\.', arr)
+                uf_model.append([int(arr[1]), int(arr[2])])
+            uf_model = sorted(uf_model)[-1]
+            fl_ = os.path.join(out_dir, 'seq2seq_'+str(uf_model[0])+'_'+str(uf_model[1])+'.model')
+            model.load_state_dict(torch.load(fl_))
     else:
         lead_dir = opt.data_dir+'/seq2seq_results-'
         for k in range(1000000):
@@ -168,7 +170,6 @@ if opt.task == 'train':
 
             optimizer.zero_grad()
             loss.backward()
-            #torch.nn.utils.clip_grad_norm(model.parameters(), opt.grad_clip)
             optimizer.step()
         
             end_time = time.time()
