@@ -279,9 +279,7 @@ if opt.task == 'validate':
             for itm in best_arr:
                 if len(itm) == 0:
                     continue
-                itm[1] = str(itm[1])
-                itm[2] = str(itm[2])
-                fout.write(' '.join(itm)+'\n')
+                fout.write(' '.join([itm[0], str(itm[1]), str(itm[2])])+'\n')
             fout.close()
 '''
 fastbeam
