@@ -79,6 +79,8 @@ class AttentionBahdanau(torch.nn.Module):
             
         if self.coverage == 'simple':
             attn = attn - past_attn
+        if self.coverage == 'norm':
+            attn = attn / (past_attn + 1e-16)
         if self.coverage == 'concat':
             attn = self.cover_in(torch.cat((attn, past_attn), 1))
         if self.coverage == 'gru':
@@ -174,6 +176,8 @@ class AttentionLuong(torch.nn.Module):
             
         if self.coverage == 'simple':
             attn -= past_attn
+        if self.coverage == 'norm':
+            attn = attn / (past_attn + 1e-16)
         if self.coverage == 'concat':
             attn = self.cover_in(torch.cat((attn, past_attn), 1))
         if self.coverage == 'gru':
