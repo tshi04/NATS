@@ -154,19 +154,23 @@ if opt.task == 'train':
                 src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
                 max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
             )
-            logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
+            src_var = src_var.cuda()
+            trg_input_var = trg_input_var.cuda()
+            trg_output_var = trg_output_var.cuda()
+            logits, attn_, p_gen = model(src_var, trg_input_var)
+
             if opt.pointer_net:
-                logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen)
+                logits = model.cal_dist(src_var, logits, attn_, p_gen)
             else:
                 logits = F.softmax(logits, dim=2)
-            
+
             if batch_id%1 == 0:
                 word_prob = logits.data.cpu().numpy().argmax(axis=2)
                 
             logits = torch.log(logits)
             loss = loss_criterion(
                 logits.contiguous().view(-1, len(vocab2id)),
-                trg_output_var.view(-1).cuda()
+                trg_output_var.view(-1)
             )
 
             optimizer.zero_grad()
