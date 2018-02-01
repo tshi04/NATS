@@ -78,7 +78,7 @@ def create_batch_file(path_, fkey_, file_, batch_size):
 '''
 Process the minibatch.
 '''
-def process_minibatch(batch_id, path_, fkey_, batch_size, vocab2id, max_lens=[400, 100]):
+def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id, max_lens=[400, 100]):
     file_ = os.path.join(path_, 'batch_'+fkey_+'_'+str(batch_size), str(batch_id))
     fp = open(file_, 'r')
     src_arr = []
@@ -102,8 +102,8 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, vocab2id, max_lens=[40
         dart = filter(None, dart)
         src_lens.append(len(dart))
         dart2id = [
-            vocab2id[wd] if wd in vocab2id
-            else vocab2id['<unk>']
+            src_vocab2id[wd] if wd in src_vocab2id
+            else src_vocab2id['<unk>']
             for wd in dart
         ]
         src_arr.append(dart2id)
@@ -116,7 +116,7 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, vocab2id, max_lens=[40
     trg_arr = [itm[:trg_max_lens] for itm in trg_arr]
 
     src_arr = [
-        itm + [vocab2id['<pad>']]*(src_max_lens-len(itm))
+        itm + [src_vocab2id['<pad>']]*(src_max_lens-len(itm))
         for itm in src_arr
     ]
     trg_input_arr = [

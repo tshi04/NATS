@@ -31,6 +31,8 @@ parser.add_argument('--src_num_layers', type=int, default=1, help='encoder numbe
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
 parser.add_argument('--word_mincount', type=int, default=5, help='min word frequency')
+parser.add_argument('--src_vocab_size', type=int, default=150000, help='max number of words in the vocabulary.')
+parser.add_argument('--src_word_mincount', type=int, default=5, help='min word frequency')
 parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder bidirectional?')
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
@@ -62,6 +64,15 @@ vocab2id, id2vocab = construct_vocab(
     mincount=opt.word_mincount
 )
 print 'The vocabulary size: {0}'.format(len(vocab2id))
+src_vocab2id = vocab2id
+src_id2vocab = id2vocab
+if not opt.shared_embedding:
+    src_vocab2id, src_id2vocab = construct_vocab(
+        file_=opt.data_dir+'/'+opt.file_vocab,
+        max_size=opt.src_vocab_size,
+        mincount=opt.src_word_mincount
+    )
+    print 'The vocabulary size: {0}'.format(len(src_vocab2id))
 
 if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or opt.task == 'test':
     model = Seq2Seq(
@@ -72,7 +83,7 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or op
         src_hidden_dim=opt.src_hidden_dim,
         trg_hidden_dim=opt.trg_hidden_dim,
         attn_hidden_dim=opt.attn_hidden_dim,
-        src_vocab_size=len(vocab2id),
+        src_vocab_size=len(src_vocab2id),
         trg_vocab_size=len(vocab2id),
         src_nlayer=opt.src_num_layers,
         trg_nlayer=opt.trg_num_layers,
@@ -139,7 +150,8 @@ if opt.task == 'train':
                 cclb += 1
             src_var, trg_input_var, trg_output_var = process_minibatch(
                 batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
-                batch_size=opt.batch_size, vocab2id=vocab2id, 
+                batch_size=opt.batch_size, 
+                src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
                 max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
             )
             logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
@@ -234,7 +246,8 @@ if opt.task == 'validate':
             for batch_id in range(val_batch):
                 src_var, trg_input_var, trg_output_var = process_minibatch(
                     batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
-                    batch_size=opt.batch_size, vocab2id=vocab2id, 
+                    batch_size=opt.batch_size,
+                    src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
                     max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
                 )
                 logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
@@ -290,7 +303,8 @@ if opt.task == 'fastbeam':
     for batch_id in range(test_batch):
         src_var, trg_input_var, trg_output_var = process_minibatch(
             batch_id=batch_id, path_=opt.data_dir, fkey_='test', 
-            batch_size=opt.batch_size, vocab2id=vocab2id, 
+            batch_size=opt.batch_size,
+            src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
             max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
         )
         beam_seq, beam_prb = fast_beam_search(

@@ -542,7 +542,7 @@ class Seq2Seq(torch.nn.Module):
         # the same for summarization.
         if self.shared_emb:
             self.embedding = torch.nn.Embedding(
-                self.src_vocab_size,
+                self.trg_vocab_size,
                 self.src_emb_dim,
                 padding_idx=0
             ).cuda()
