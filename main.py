@@ -44,7 +44,6 @@ parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer 
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
-parser.add_argument('--clean_batch', type=bool, default=False, help='Do you want to clean the batch folder?')
 parser.add_argument('--checkpoint', type=int, default=500, help='How often you want to save model?')
 parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
 parser.add_argument('--nbestmodel', type=int, default=10, help='How many models you want to keep?')
@@ -63,15 +62,6 @@ vocab2id, id2vocab = construct_vocab(
     mincount=opt.word_mincount
 )
 print 'The vocabulary size: {0}'.format(len(vocab2id))
-if opt.task == 'test' or opt.task == 'fastbeam':
-    test_batch = create_batch_file(
-        path_=opt.data_dir,
-        fkey_='test',
-        file_=opt.file_test,
-        batch_size=opt.batch_size,
-        clean=opt.clean_batch
-    )
-    print 'The number of batches (test): {0}'.format(test_batch)
 
 if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or opt.task == 'test':
     model = Seq2Seq(
@@ -101,14 +91,6 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or op
 train
 '''
 if opt.task == 'train':
-    n_batch = create_batch_file(
-        path_=opt.data_dir,
-        fkey_='train',
-        file_=opt.file_corpus,
-        batch_size=opt.batch_size,
-        clean=opt.clean_batch
-    )
-    print 'The number of batches: {0}'.format(n_batch)
     
     weight_mask = torch.ones(len(vocab2id)).cuda()
     weight_mask[vocab2id['<pad>']] = 0
@@ -143,6 +125,13 @@ if opt.task == 'train':
     start_time = time.time()
     cclb = 0
     for epoch in range(uf_model[0], opt.n_epoch):
+        n_batch = create_batch_file(
+            path_=opt.data_dir,
+            fkey_='train',
+            file_=opt.file_corpus,
+            batch_size=opt.batch_size
+        )
+        print 'The number of batches: {0}'.format(n_batch)
         for batch_id in range(n_batch):
             if cclb == 0 and batch_id <= uf_model[1]:
                 continue
@@ -159,7 +148,7 @@ if opt.task == 'train':
             else:
                 logits = F.softmax(logits, dim=2)
             
-            if batch_id%100 == 0:
+            if batch_id%1 == 0:
                 word_prob = logits.data.cpu().numpy().argmax(axis=2)
                 
             logits = torch.log(logits)
@@ -180,7 +169,7 @@ if opt.task == 'train':
                 fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'w')
                 torch.save(model.state_dict(), fmodel)
                 fmodel.close()
-            if batch_id%100 == 0:
+            if batch_id%1 == 0:
                 end_time = time.time()
                 sen_pred = [id2vocab[x] for x in word_prob[0]]
                 print 'epoch={0} batch={1} loss={2}, time_escape={3}s={4}h'.format(
@@ -209,8 +198,7 @@ if opt.task == 'validate':
         path_=opt.data_dir,
         fkey_='validate',
         file_=opt.file_val,
-        batch_size=opt.batch_size,
-        clean=opt.clean_batch
+        batch_size=opt.batch_size
     )
     print 'The number of batches (test): {0}'.format(val_batch)
     
@@ -286,6 +274,14 @@ if opt.task == 'validate':
 fastbeam
 '''
 if opt.task == 'fastbeam':
+    test_batch = create_batch_file(
+        path_=opt.data_dir,
+        fkey_='test',
+        file_=opt.file_test,
+        batch_size=opt.batch_size
+    )
+    print 'The number of batches (test): {0}'.format(test_batch)
+    
     model.load_state_dict(torch.load(
         os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
     

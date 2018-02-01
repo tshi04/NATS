@@ -2,6 +2,7 @@ import os
 import re
 import glob
 import shutil
+import random
 import numpy as np
 
 import torch
@@ -33,14 +34,9 @@ def construct_vocab(file_, max_size=200000, mincount=5):
 '''
 Split the corpus into batches.
 '''
-def create_batch_file(path_, fkey_, file_, batch_size, clean=False):
+def create_batch_file(path_, fkey_, file_, batch_size):
     file_name = os.path.join(path_, file_)
     folder = os.path.join(path_, 'batch_'+fkey_+'_'+str(batch_size))
-    
-    if os.path.exists(folder):
-        batch_files = glob.glob(os.path.join(folder, '*'))
-        if len(batch_files) > 0 and clean==False:
-            return len(batch_files)
     
     try:
         shutil.rmtree(folder)
@@ -48,29 +44,35 @@ def create_batch_file(path_, fkey_, file_, batch_size, clean=False):
     except:
         os.mkdir(folder)
     
+    corpus_arr = []
     fp = open(file_name, 'r')
-    cnt = 0
     for line in fp:
+        corpus_arr.append(line)
+    fp.close()
+    if fkey_ == 'train':
+        random.shuffle(corpus_arr)
+        
+    cnt = 0
+    for itm in corpus_arr:
         try:
-            arr.append(line)
+            arr.append(itm)
         except:
-            arr = [line]
+            arr = [itm]
         if len(arr) == batch_size:
             fout = open(os.path.join(folder, str(cnt)), 'w')
-            for itm in arr:
-                fout.write(itm)
+            for sen in arr:
+                fout.write(sen)
             fout.close()
             arr = []
             cnt += 1
-    
+        
     if len(arr) > 0:
         fout = open(os.path.join(folder, str(cnt)), 'w')
-        for itm in arr:
-            fout.write(itm)
+        for sen in arr:
+            fout.write(sen)
         fout.close()
         arr = []
         cnt += 1
-        fp.close()
     
     return cnt
 '''
