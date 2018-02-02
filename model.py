@@ -825,19 +825,19 @@ class Seq2Seq(torch.nn.Module):
 
         return decoder_output, hidden_decoder, h_attn, hidden_attn, past_attn, p_gen, attn_
 
-    def cal_dist(self, input_src, logits, attn_, p_gen):
+    def cal_dist(self, input_src, logits_, attn_, p_gen, src_vocab2id):
     
         src_seq_len = input_src.size(1)
-        trg_seq_len = logits.size(1)
+        trg_seq_len = logits_.size(1)
         batch_size = input_src.size(0)
-        vocab_size = logits.size(2)
-
-        logits = F.softmax(logits, dim=2)
+        vocab_size = len(src_vocab2id)
+                
+        logits_ = F.softmax(logits_, dim=2)
         attn_ = attn_.transpose(0, 1)
-        
+
         pt_idx = Variable(torch.FloatTensor(torch.zeros(1, 1, 1))).cuda()
         pt_idx = pt_idx.repeat(batch_size, src_seq_len, vocab_size)
         pt_idx.scatter_(2, input_src.unsqueeze(2), 1.0)
-
-        return p_gen.unsqueeze(2)*logits + (1.0-p_gen.unsqueeze(2))*torch.bmm(attn_, pt_idx)
+        
+        return p_gen.unsqueeze(2)*logits_ + (1.0-p_gen.unsqueeze(2))*torch.bmm(attn_, pt_idx)
     

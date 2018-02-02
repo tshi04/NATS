@@ -1,19 +1,33 @@
 # Text summarization
 
-Summarization with coverage for a research paper.
+Abstractive Text Summarization: A Review.
 
-### Reference
+### Package Required
+1. 
+
+### Note
+
+
+
+### Some Limitations
+
+1. For the pointer-generator network, we cannot handle the case when the vocabulary for source text and summaries are different.
+2. Since we test some coverage mechanisms, the length of source text and summaries are fixed in the beginning. It is not flexiable.
+3. When using the argmentation like: 
+    python main.py --pointer_net False
+   It will still pointer_net=True. 
+   It is highly recommended to make changes to the default value of main.py and run python main.py
+   
+### Work to do
+
+1. In the beam search, add a function that can copy the word to replace unk.
+2. In the attention part, add a function that can attend the decoder part as well.
+
+### Git Referenced
+
 - https://github.com/abisee/pointer-generator.git
 - https://github.com/MaximumEntropy/Seq2Seq-PyTorch
 - https://github.com/OpenNMT/OpenNMT
 - https://github.com/spro/practical-pytorch
 
-### Note
-
-When using the package,
-python main.py --pointer_net False
-will not work. Anything related with bool type gives error. It always gives True.
-
-
-It is highly recommended to make changes to the default value of main.py and run
-python main.py
+And more.

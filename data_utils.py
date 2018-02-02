@@ -133,4 +133,3 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id
     trg_output_var = Variable(torch.LongTensor(trg_output_arr))
     
     return src_var, trg_input_var, trg_output_var
-

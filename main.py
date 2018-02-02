@@ -47,7 +47,7 @@ parser.add_argument('--learning_rate', type=float, default=0.0001, help='learnin
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
 parser.add_argument('--checkpoint', type=int, default=500, help='How often you want to save model?')
-parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
+parser.add_argument('--continue_training', type=bool, default=False, help='Do you want to continue?')
 parser.add_argument('--nbestmodel', type=int, default=10, help='How many models you want to keep?')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
@@ -58,6 +58,8 @@ parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 parser.add_argument('--file_val', default='val.txt', help='test data')
 opt = parser.parse_args()
 
+if opt.pointer_net:
+    opt.shared_embedding = True
 vocab2id, id2vocab = construct_vocab(
     file_=opt.data_dir+'/'+opt.file_vocab,
     max_size=opt.vocab_size,
@@ -160,12 +162,12 @@ if opt.task == 'train':
             logits, attn_, p_gen = model(src_var, trg_input_var)
 
             if opt.pointer_net:
-                logits = model.cal_dist(src_var, logits, attn_, p_gen)
+                logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)
             else:
                 logits = F.softmax(logits, dim=2)
 
             if batch_id%1 == 0:
-                word_prob = logits.data.cpu().numpy().argmax(axis=2)
+                word_prob = logits.topk(1, dim=2)[1].squeeze(2).data.cpu().numpy()
                 
             logits = torch.log(logits)
             loss = loss_criterion(
