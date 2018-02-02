@@ -3,7 +3,9 @@
 Abstractive Text Summarization: A Review.
 
 ### Package Required
-1. 
+1. Pytorch 0.3.0.post4
+Please refer these two scripts: https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG
+
 
 ### Note
 
