@@ -23,9 +23,9 @@ def fast_beam_search(
     batch_size = src_text.size(0)
     src_text_rep = src_text.unsqueeze(1).clone().repeat(1, beam_size, 1).view(-1, src_text.size(1)).cuda()
     if network == 'lstm':
-        encoder_hy, (h0_new, c0_new), h_attn_new, hidden_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
+        encoder_hy, (h0_new, c0_new), h_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
     else:
-        encoder_hy, hidden_decoder_new, h_attn_new, hidden_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
+        encoder_hy, hidden_decoder_new, h_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
     
     beam_seq = Variable(torch.LongTensor(batch_size, beam_size, max_len+1).fill_(vocab2id['<pad>'])).cuda()
     beam_seq[:, :, 0] = vocab2id['<s>']
@@ -34,21 +34,19 @@ def fast_beam_search(
     
     for j in range(max_len):
         if network == 'lstm':
-            logits, (h0, c0), h_attn, hidden_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
+            logits, (h0, c0), h_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
                 last_wd.view(-1, 1), 
                 (h0_new, c0_new),
                 h_attn_new,
                 encoder_hy, 
-                hidden_attn_new, 
                 past_attn_new
             )
         else:
-            logits, hidden_decoder, h_attn, hidden_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
+            logits, hidden_decoder, h_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
                 last_wd.view(-1, 1), 
                 hidden_decoder_new,
                 h_attn_new, 
                 encoder_hy,
-                hidden_attn_new, 
                 past_attn_new
             )
         if pointer_net:
@@ -70,7 +68,6 @@ def fast_beam_search(
             else:
                 hidden_decoder_new = hidden_decoder
             h_attn_new = h_attn
-            hidden_attn_new = hidden_attn
             past_attn_new = past_attn
             continue
 
@@ -88,7 +85,6 @@ def fast_beam_search(
         else:
             hidden_decoder_new = hidden_decoder_new.view(batch_size, beam_size, hidden_decoder_new.size(-1))
         h_attn_new = h_attn_new.view(batch_size, beam_size, h_attn_new.size(1))
-        hidden_attn_new = hidden_attn_new.view(batch_size, beam_size, hidden_attn_new.size(1))
         past_attn_new = past_attn_new.view(batch_size, beam_size, past_attn_new.size(1))
         
         if network == 'lstm':
@@ -101,8 +97,6 @@ def fast_beam_search(
             hidden_decoder = tensor_transformer(hidden_decoder, batch_size, beam_size)
         h_attn = h_attn.view(batch_size, beam_size, h_attn.size(1))
         h_attn = tensor_transformer(h_attn, batch_size, beam_size)
-        hidden_attn = hidden_attn.view(batch_size, beam_size, hidden_attn.size(1))
-        hidden_attn = tensor_transformer(hidden_attn, batch_size, beam_size)
         past_attn = past_attn.view(batch_size, beam_size, past_attn.size(1))
         past_attn = tensor_transformer(past_attn, batch_size, beam_size)
         
@@ -119,7 +113,6 @@ def fast_beam_search(
                 else:
                     hidden_decoder_new[x, b] = hidden_decoder[x, tmp_idx[x, b]]
                 h_attn_new[x, b] = h_attn[x, tmp_idx[x, b]]
-                hidden_attn_new[x, b] = hidden_attn[x, tmp_idx[x, b]]
                 past_attn_new[x, b] = past_attn[x, tmp_idx[x, b]]
         
         if network == 'lstm':
@@ -128,7 +121,6 @@ def fast_beam_search(
         else:
             hidden_decoder_new = hidden_decoder_new.view(-1, hidden_decoder_new.size(-1))
         h_attn_new = h_attn_new.view(-1, h_attn_new.size(-1))
-        hidden_attn_new = hidden_attn_new.view(-1, hidden_attn_new.size(-1))
         past_attn_new = past_attn_new.view(-1, past_attn_new.size(-1))
         
     return beam_seq, beam_prb

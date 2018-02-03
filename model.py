@@ -44,7 +44,7 @@ class AttentionBahdanau(torch.nn.Module):
             self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
             self.attn_out = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
                         
-    def forward(self, last_dehy, enhy, past_attn, hidden_attn):
+    def forward(self, last_dehy, enhy, past_attn):
 
         if self.attn_method == 'bahdanau_dot':
             attn = torch.bmm(enhy, last_dehy.unsqueeze(2)).squeeze(2)
@@ -61,7 +61,7 @@ class AttentionBahdanau(torch.nn.Module):
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
         h_attn = torch.bmm(attn2, enhy).squeeze(1)
 
-        return h_attn, attn, hidden_attn
+        return h_attn, attn
 '''
 Luong, M. T., Pham, H., & Manning, C. D. (2015). 
 Effective approaches to attention-based neural machine translation. 
@@ -108,7 +108,7 @@ class AttentionLuong(torch.nn.Module):
             bias=False
         ).cuda()      
         
-    def forward(self, dehy, enhy, past_attn, hidden_attn):
+    def forward(self, dehy, enhy, past_attn):
         
         if self.method == 'luong_concat':
             attn_agg = self.attn_en_in(enhy) + self.attn_de_in(dehy.unsqueeze(1))
@@ -134,7 +134,7 @@ class AttentionLuong(torch.nn.Module):
         h_attn = self.attn_out(torch.cat((attn_enhy, dehy), 1))
         h_attn = F.tanh(h_attn)
 
-        return h_attn, attn, hidden_attn
+        return h_attn, attn
 '''
 LSTM decoder
 '''    
@@ -201,7 +201,7 @@ class LSTMDecoder(torch.nn.Module):
             self.pt_out = torch.nn.Linear(
                 self.input_size+self.hidden_size*2, 1).cuda()
         
-    def forward(self, input_, hidden_, h_attn, encoder_hy, hidden_attn, past_attn, p_gen):
+    def forward(self, input_, hidden_, h_attn, encoder_hy, past_attn, p_gen):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -215,11 +215,10 @@ class LSTMDecoder(torch.nn.Module):
                 output_.append(hidden_[0])
         if self.attn_method[:8] == 'bahdanau':
             for k in range(input_.size(0)):
-                h_attn, attn, hidden_attn = self.attn_layer(
+                h_attn, attn = self.attn_layer(
                     hidden_[0], 
                     encoder_hy.transpose(0,1),
-                    past_attn=past_attn,
-                    hidden_attn=hidden_attn
+                    past_attn=past_attn
                 )
                 if self.coverage == 'asee':
                     past_attn = past_attn + attn
@@ -243,11 +242,10 @@ class LSTMDecoder(torch.nn.Module):
                 else:
                     x_input = input_[k]
                 hidden_ = self.lstm_(x_input, hidden_)
-                h_attn, attn, hidden_attn = self.attn_layer(
+                h_attn, attn = self.attn_layer(
                     hidden_[0], 
                     encoder_hy.transpose(0,1), 
-                    past_attn=past_attn,
-                    hidden_attn=hidden_attn
+                    past_attn=past_attn
                 )
                 if self.coverage == 'asee':
                     past_attn = past_attn + attn
@@ -279,7 +277,7 @@ class LSTMDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
    
-        return output_, hidden_, h_attn, out_attn, hidden_attn, past_attn, p_gen
+        return output_, hidden_, h_attn, out_attn, past_attn, p_gen
 '''
 GRU decoder
 '''
@@ -346,7 +344,7 @@ class GRUDecoder(torch.nn.Module):
             self.pt_out = torch.nn.Linear(
                 self.hidden_size*3, 1).cuda()
             
-    def forward(self, input_, hidden_, h_attn, encoder_hy, hidden_attn, past_attn, p_gen):
+    def forward(self, input_, hidden_, h_attn, encoder_hy, past_attn, p_gen):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -361,11 +359,10 @@ class GRUDecoder(torch.nn.Module):
                 output_.append(hidden_)
         if self.attn_method[:8] == 'bahdanau':
             for k in range(input_.size(0)):
-                h_attn, attn, hidden_attn = self.attn_layer(
+                h_attn, attn = self.attn_layer(
                     hidden_, 
                     encoder_hy.transpose(0,1),
-                    past_attn=past_attn,
-                    hidden_attn=hidden_attn
+                    past_attn=past_attn
                 )
                 if self.coverage == 'asee':
                     past_attn = past_attn + attn
@@ -388,11 +385,10 @@ class GRUDecoder(torch.nn.Module):
                 else:
                     x_input = input_[k]
                 hidden_ = self.gru_(x_input, hidden_)
-                h_attn, attn, hidden_attn = self.attn_layer(
+                h_attn, attn = self.attn_layer(
                     hidden_, 
                     encoder_hy.transpose(0,1),
-                    past_attn=past_attn,
-                    hidden_attn=hidden_attn
+                    past_attn=past_attn
                 )
                 if self.coverage == 'asee':
                     past_attn = past_attn + attn
@@ -423,7 +419,7 @@ class GRUDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
 
-        return output_, hidden_, h_attn, out_attn, hidden_attn, past_attn, p_gen
+        return output_, hidden_, h_attn, out_attn, past_attn, p_gen
 '''
 sequence to sequence model
 ''' 
@@ -573,8 +569,6 @@ class Seq2Seq(torch.nn.Module):
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
-        hidden_attn = Variable(torch.zeros(
-            batch_size, self.attn_hidden_dim)).cuda()
         if self.coverage == 'norm':
             past_attn = Variable(torch.ones(
                 batch_size, src_seq_len)).cuda()
@@ -607,12 +601,11 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, (_, _), _, attn_, hidden_attn, _, p_gen = self.decoder(
+            trg_h, (_, _), _, attn_, _, p_gen = self.decoder(
                 trg_emb,
                 (decoder_h0, decoder_c0),
                 h_attn,
                 encoder_hy,
-                hidden_attn,
                 past_attn,
                 p_gen
             )
@@ -630,12 +623,11 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, _, _, attn_, hidden_attn, _, p_gen = self.decoder(
+            trg_h, _, _, attn_, _, p_gen = self.decoder(
                 trg_emb,
                 decoder_h0,
                 h_attn,
                 encoder_hy,
-                hidden_attn,
                 past_attn,
                 p_gen
             )
@@ -665,8 +657,6 @@ class Seq2Seq(torch.nn.Module):
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
-        hidden_attn = Variable(torch.zeros(
-            batch_size, self.attn_hidden_dim)).cuda()
         if self.coverage == 'norm':
             past_attn = Variable(torch.ones(
                 batch_size, src_seq_len)).cuda()
@@ -699,7 +689,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
             
-            return encoder_hy, (decoder_h0, decoder_c0), h_attn, hidden_attn, past_attn
+            return encoder_hy, (decoder_h0, decoder_c0), h_attn, past_attn
         
         elif self.network_ == 'gru':
             src_h, src_h_t = self.encoder(
@@ -715,7 +705,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            return encoder_hy, decoder_h0, h_attn, hidden_attn, past_attn, p_gen
+            return encoder_hy, decoder_h0, h_attn, past_attn, p_gen
     
     def forward_onestep_decoder(
         self, 
@@ -723,7 +713,6 @@ class Seq2Seq(torch.nn.Module):
         hidden_decoder,
         h_attn,
         encoder_hy,
-        hidden_attn,
         past_attn
     ):
         if self.shared_emb:
@@ -738,22 +727,20 @@ class Seq2Seq(torch.nn.Module):
         p_gen = Variable(torch.zeros(batch_size, 1)).cuda()
         
         if self.network_ == 'lstm':
-            trg_h, hidden_decoder, h_attn, attn_, hidden_attn, past_attn, p_gen = self.decoder(
+            trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen = self.decoder(
                 trg_emb,
                 hidden_decoder,
                 h_attn,
                 encoder_hy,
-                hidden_attn,
                 past_attn,
                 p_gen
             )
         if self.network_ == 'gru':
-            trg_h, hidden_decoder, h_attn, attn_, hidden_attn, past_attn, p_gen = self.decoder(
+            trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen = self.decoder(
                 trg_emb,
                 hidden_decoder,
                 h_attn,
                 encoder_hy,
-                hidden_attn,
                 past_attn,
                 p_gen
             )
@@ -766,7 +753,7 @@ class Seq2Seq(torch.nn.Module):
         decoder_output = decoder_output.view(
             trg_h.size(0), trg_h.size(1), decoder_output.size(1))
 
-        return decoder_output, hidden_decoder, h_attn, hidden_attn, past_attn, p_gen, attn_
+        return decoder_output, hidden_decoder, h_attn, past_attn, p_gen, attn_
 
     def cal_dist(self, input_src, logits_, attn_, p_gen, src_vocab2id):
     
