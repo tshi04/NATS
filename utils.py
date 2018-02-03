@@ -52,7 +52,7 @@ def fast_beam_search(
                 past_attn_new
             )
         if pointer_net:
-            logits = model.cal_dist(src_text_rep, logits, attn_, p_gen)
+            logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
         else:
             logits = F.softmax(logits, dim=2)
         

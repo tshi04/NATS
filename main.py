@@ -39,7 +39,7 @@ parser.add_argument('--shared_embedding', type=bool, default=True, help='source 
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 parser.add_argument('--attn_method', default='luong_concat',
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='vanilla', help='vanilla | simple | norm | concat | gru | asee')
+parser.add_argument('--coverage', default='norm', help='vanilla | norm | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--attn_as_input', type=bool, default=True, help='(Luong) use h_attn as input as well.')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
@@ -78,8 +78,6 @@ if not opt.shared_embedding:
 
 if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or opt.task == 'test':
     model = Seq2Seq(
-        src_seq_len=opt.src_seq_lens,
-        trg_seq_len=opt.trg_seq_lens,
         src_emb_dim=opt.src_emb_dim,
         trg_emb_dim=opt.trg_emb_dim,
         src_hidden_dim=opt.src_hidden_dim,
@@ -258,7 +256,7 @@ if opt.task == 'validate':
                 )
                 logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
                 if opt.pointer_net:
-                    logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen)
+                    logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen, vocab2id)
                 else:
                     logits = F.softmax(logits, dim=2)
 

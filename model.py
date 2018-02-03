@@ -2,9 +2,6 @@
 Copyright 2017 @ Tian Shi
 @author Tian Shi
 Please contact tshi at vt dot edu.
-
-This framework is not flexiable in the length of encoder and decoder,
-since we need to use the coverage mechanism.
 '''
 import torch
 import torch.nn.functional as F
@@ -22,16 +19,12 @@ class AttentionBahdanau(torch.nn.Module):
 
     def __init__(
         self,
-        src_seq_len,
-        trg_seq_len,
         attn_hidden_size,
         hidden_size,
         attn_method,
         coverage,
     ):
         super(AttentionBahdanau, self).__init__()   
-        self.src_seq_len = src_seq_len
-        self.trg_seq_len = trg_seq_len
         self.attn_method = attn_method.lower()
         self.coverage = coverage
         self.hidden_size = hidden_size
@@ -51,22 +44,7 @@ class AttentionBahdanau(torch.nn.Module):
             if self.coverage == 'asee':
                 self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
             self.attn_out = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
-            
-        if self.coverage == 'concat':
-            self.cover_in = torch.nn.Linear(
-                self.src_seq_len*2,
-                self.src_seq_len
-            ).cuda()
-        if self.coverage == 'gru':
-            self.gru_ = torch.nn.GRUCell(
-                self.src_seq_len, 
-                self.attn_hidden_size
-            ).cuda()
-            self.gru_out = torch.nn.Linear(
-                self.attn_hidden_size,
-                self.src_seq_len
-            ).cuda()
-            
+                        
     def forward(self, last_dehy, enhy, past_attn, hidden_attn):
 
         if self.attn_method == 'bahdanau_dot':
@@ -77,20 +55,12 @@ class AttentionBahdanau(torch.nn.Module):
                 attn_agg = attn_agg + self.attn_cv_in(past_attn.unsqueeze(2))
             attn = self.attn_out(F.tanh(attn_agg)).squeeze(2)
             
-        if self.coverage == 'simple':
-            attn = attn - past_attn
         if self.coverage == 'norm':
-            attn = attn / (past_attn + 1e-16)
-        if self.coverage == 'concat':
-            attn = self.cover_in(torch.cat((attn, past_attn), 1))
-        if self.coverage == 'gru':
-            hidden_attn = self.gru_(attn, hidden_attn)
-            attn = self.gru_out(hidden_attn)
+            attn = torch.exp(attn) / past_attn
 
         attn = F.softmax(attn, dim=1)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
         h_attn = torch.bmm(attn2, enhy).squeeze(1)
-        #h_attn = F.tanh(h_attn)
 
         return h_attn, attn, hidden_attn
 '''
@@ -102,16 +72,12 @@ class AttentionLuong(torch.nn.Module):
     
     def __init__(
         self,
-        src_seq_len,
-        trg_seq_len,
         attn_hidden_size,
         hidden_size,
         attn_method,
         coverage,
     ):
         super(AttentionLuong, self).__init__()
-        self.src_seq_len = src_seq_len
-        self.trg_seq_len = trg_seq_len
         self.method = attn_method.lower()
         self.hidden_size = hidden_size
         self.coverage = coverage
@@ -142,22 +108,7 @@ class AttentionLuong(torch.nn.Module):
             self.hidden_size*2,
             self.hidden_size,
             bias=False
-        ).cuda()
-        
-        if self.coverage == 'concat':
-            self.cover_in = torch.nn.Linear(
-                self.src_seq_len*2,
-                self.src_seq_len
-            ).cuda()
-        elif self.coverage == 'gru':
-            self.gru_ = torch.nn.GRUCell(
-                self.src_seq_len, 
-                self.attn_hidden_size
-            ).cuda()
-            self.gru_out = torch.nn.Linear(
-                self.attn_hidden_size,
-                self.src_seq_len
-            ).cuda()            
+        ).cuda()      
         
     def forward(self, dehy, enhy, past_attn, hidden_attn):
         
@@ -174,15 +125,8 @@ class AttentionLuong(torch.nn.Module):
             else:
                 attn = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
             
-        if self.coverage == 'simple':
-            attn -= past_attn
         if self.coverage == 'norm':
-            attn = attn / (past_attn + 1e-16)
-        if self.coverage == 'concat':
-            attn = self.cover_in(torch.cat((attn, past_attn), 1))
-        if self.coverage == 'gru':
-            hidden_attn = self.gru_(attn, hidden_attn)
-            attn = self.gru_out(hidden_attn)
+            attn = torch.exp(attn) / past_attn
         
         attn = F.softmax(attn, dim=1)
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
@@ -199,8 +143,6 @@ LSTM decoder
 class LSTMDecoder(torch.nn.Module):
     def __init__(
         self,
-        src_seq_len,
-        trg_seq_len,
         attn_hidden_size,
         input_size, # embedding size
         hidden_size, # h size
@@ -213,8 +155,6 @@ class LSTMDecoder(torch.nn.Module):
     ):
         super(LSTMDecoder, self).__init__()
         # parameters
-        self.src_seq_len = src_seq_len
-        self.trg_seq_len = trg_seq_len
         self.attn_hidden_size = attn_hidden_size
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -236,8 +176,6 @@ class LSTMDecoder(torch.nn.Module):
                 self.hidden_size
             ).cuda()
             self.attn_layer = AttentionBahdanau(
-                src_seq_len=self.src_seq_len,
-                trg_seq_len=self.trg_seq_len,
                 attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method,
@@ -255,8 +193,6 @@ class LSTMDecoder(torch.nn.Module):
                     self.hidden_size
                 ).cuda()
             self.attn_layer = AttentionLuong(
-                src_seq_len=self.src_seq_len,
-                trg_seq_len=self.trg_seq_len,
                 attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method, 
@@ -287,8 +223,9 @@ class LSTMDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                past_attn = past_attn + attn
-                past_attn = F.softmax(past_attn, dim=1)
+                if k == 0:
+                    past_attn = past_attn*0.0
+                past_attn = past_attn + torch.exp(attn)
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.lstm_(x_input, hidden_)
                 output_.append(hidden_[0])
@@ -311,8 +248,9 @@ class LSTMDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                past_attn = past_attn + attn
-                past_attn = F.softmax(past_attn, dim=1)
+                if k == 0:
+                    past_attn = past_attn*0.0
+                past_attn = past_attn + torch.exp(attn)
                 output_.append(h_attn)
                 out_attn.append(attn)
                 if self.pointer_net:
@@ -344,8 +282,6 @@ GRU decoder
 class GRUDecoder(torch.nn.Module):
     def __init__(
         self,
-        src_seq_len,
-        trg_seq_len,
         attn_hidden_size,
         input_size,
         hidden_size,
@@ -358,8 +294,6 @@ class GRUDecoder(torch.nn.Module):
     ):
         super(GRUDecoder, self).__init__()
         # parameters
-        self.src_seq_len = src_seq_len
-        self.trg_seq_len = trg_seq_len
         self.attn_hidden_size = attn_hidden_size
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -381,8 +315,6 @@ class GRUDecoder(torch.nn.Module):
                 self.hidden_size
             ).cuda()
             self.attn_layer = AttentionBahdanau(
-                src_seq_len=self.src_seq_len,
-                trg_seq_len=self.trg_seq_len,
                 attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method,
@@ -400,8 +332,6 @@ class GRUDecoder(torch.nn.Module):
                     self.hidden_size
                 ).cuda()
             self.attn_layer = AttentionLuong(
-                src_seq_len=self.src_seq_len,
-                trg_seq_len=self.trg_seq_len,
                 attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method,
@@ -433,8 +363,9 @@ class GRUDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                past_attn = past_attn + attn
-                past_attn = F.softmax(past_attn, dim=1)
+                if k == 0:
+                    past_attn = past_attn*0.0
+                past_attn = past_attn + torch.exp(attn)
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.gru_(x_input, hidden_)
                 output_.append(hidden_)
@@ -456,8 +387,9 @@ class GRUDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                past_attn = past_attn + attn
-                past_attn = F.softmax(past_attn, dim=1)
+                if k == 0:
+                    past_attn = past_attn*0.0
+                past_attn = past_attn + torch.exp(attn)
                 output_.append(h_attn)
                 out_attn.append(attn)
                 if self.pointer_net:
@@ -489,8 +421,6 @@ class Seq2Seq(torch.nn.Module):
     
     def __init__(
         self,
-        src_seq_len=400,
-        trg_seq_len=100,
         src_emb_dim=128,
         trg_emb_dim=128,
         src_hidden_dim=256,
@@ -512,8 +442,6 @@ class Seq2Seq(torch.nn.Module):
     ):
         super(Seq2Seq, self).__init__()
         # parameters
-        self.src_seq_len = src_seq_len
-        self.trg_seq_len = trg_seq_len
         self.src_emb_dim = src_emb_dim
         self.trg_emb_dim = trg_emb_dim
         self.src_hidden_dim = src_hidden_dim
@@ -574,8 +502,6 @@ class Seq2Seq(torch.nn.Module):
             ).cuda()
             # decoder
             self.decoder = LSTMDecoder(
-                src_seq_len=self.src_seq_len,
-                trg_seq_len=self.trg_seq_len,
                 attn_hidden_size=self.attn_hidden_dim,
                 input_size=self.trg_emb_dim,
                 hidden_size=self.trg_hidden_dim,
@@ -598,8 +524,6 @@ class Seq2Seq(torch.nn.Module):
             ).cuda()
             # decoder
             self.decoder = GRUDecoder(
-                src_seq_len=self.src_seq_len,
-                trg_seq_len=self.trg_seq_len,
                 attn_hidden_size=self.attn_hidden_dim,
                 input_size=self.trg_emb_dim,
                 hidden_size=self.trg_hidden_dim,
@@ -626,6 +550,8 @@ class Seq2Seq(torch.nn.Module):
         # however, since we make the vector to 0, so that <pad> won't affect too much.
         # Now there is no theoretical proof of it, but according to the results, the 
         # peformance is good enough.
+        src_seq_len = input_src.size(1)
+        trg_seq_len = input_trg.size(1)
         if self.shared_emb:
             src_emb = self.embedding(input_src)
             trg_emb = self.embedding(input_trg)
@@ -642,12 +568,12 @@ class Seq2Seq(torch.nn.Module):
             batch_size, self.src_hidden_dim)).cuda()
         hidden_attn = Variable(torch.zeros(
             batch_size, self.attn_hidden_dim)).cuda()
-        past_attn = Variable(torch.zeros(
-            batch_size, self.src_seq_len)).cuda()
+        past_attn = Variable(torch.ones(
+            batch_size, src_seq_len)).cuda()
         h_attn = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
         p_gen = Variable(torch.zeros(
-            batch_size, self.trg_seq_len)).cuda()
+            batch_size, trg_seq_len)).cuda()
         
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
@@ -714,6 +640,8 @@ class Seq2Seq(torch.nn.Module):
         return decoder_output, attn_, p_gen
     
     def forward_encoder(self, input_src):
+        src_seq_len = input_src.size(1)
+        
         if self.shared_emb:
             src_emb = self.embedding(input_src)
         else:
@@ -728,8 +656,8 @@ class Seq2Seq(torch.nn.Module):
             batch_size, self.src_hidden_dim)).cuda()
         hidden_attn = Variable(torch.zeros(
             batch_size, self.attn_hidden_dim)).cuda()
-        past_attn = Variable(torch.zeros(
-            batch_size, self.src_seq_len)).cuda()
+        past_attn = Variable(torch.ones(
+            batch_size, src_seq_len)).cuda()
         h_attn = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
 
