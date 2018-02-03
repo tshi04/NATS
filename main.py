@@ -41,7 +41,6 @@ parser.add_argument('--attn_method', default='luong_concat',
                     help='vanilla | bahdanau_dot | bahdanau_concat | luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='norm', help='vanilla | norm | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
-parser.add_argument('--attn_as_input', type=bool, default=True, help='(Luong) use h_attn as input as well.')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
@@ -94,7 +93,6 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or op
         coverage=opt.coverage,
         network_=opt.network_,
         pointer_net=opt.pointer_net,
-        attn_as_input=opt.attn_as_input,
         shared_emb=opt.shared_embedding
     ).cuda()
     print model
@@ -175,6 +173,7 @@ if opt.task == 'train':
 
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm(model.parameters(), opt.grad_clip)
             optimizer.step()
         
             end_time = time.time()

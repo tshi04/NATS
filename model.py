@@ -41,8 +41,7 @@ class AttentionBahdanau(torch.nn.Module):
                 self.hidden_size,
                 bias=True
             ).cuda()
-            if self.coverage == 'asee':
-                self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
+            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
             self.attn_out = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
                         
     def forward(self, last_dehy, enhy, past_attn, hidden_attn):
@@ -94,8 +93,7 @@ class AttentionLuong(torch.nn.Module):
                 self.hidden_size,
                 bias=False
             ).cuda()
-            if self.coverage == 'asee':
-                self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
+            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
             self.attn_warp_in = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
         if self.method == 'luong_general':
             self.attn_in = torch.nn.Linear(
@@ -223,9 +221,12 @@ class LSTMDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                if k == 0:
-                    past_attn = past_attn*0.0
-                past_attn = past_attn + torch.exp(attn)
+                if self.coverage == 'asee':
+                    past_attn = past_attn + attn
+                if self.coverage == 'norm':
+                    if k == 0:
+                        past_attn = past_attn*0.0
+                    past_attn = past_attn + torch.exp(attn)
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.lstm_(x_input, hidden_)
                 output_.append(hidden_[0])
@@ -248,9 +249,12 @@ class LSTMDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                if k == 0:
-                    past_attn = past_attn*0.0
-                past_attn = past_attn + torch.exp(attn)
+                if self.coverage == 'asee':
+                    past_attn = past_attn + attn
+                if self.coverage == 'norm':
+                    if k == 0:
+                        past_attn = past_attn*0.0
+                    past_attn = past_attn + torch.exp(attn)
                 output_.append(h_attn)
                 out_attn.append(attn)
                 if self.pointer_net:
@@ -363,9 +367,12 @@ class GRUDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                if k == 0:
-                    past_attn = past_attn*0.0
-                past_attn = past_attn + torch.exp(attn)
+                if self.coverage == 'asee':
+                    past_attn = past_attn + attn
+                if self.coverage == 'norm':
+                    if k == 0:
+                        past_attn = past_attn*0.0
+                    past_attn = past_attn + torch.exp(attn)
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.gru_(x_input, hidden_)
                 output_.append(hidden_)
@@ -387,9 +394,12 @@ class GRUDecoder(torch.nn.Module):
                     past_attn=past_attn,
                     hidden_attn=hidden_attn
                 )
-                if k == 0:
-                    past_attn = past_attn*0.0
-                past_attn = past_attn + torch.exp(attn)
+                if self.coverage == 'asee':
+                    past_attn = past_attn + attn
+                if self.coverage == 'norm':
+                    if k == 0:
+                        past_attn = past_attn*0.0
+                    past_attn = past_attn + torch.exp(attn)
                 output_.append(h_attn)
                 out_attn.append(attn)
                 if self.pointer_net:
@@ -471,22 +481,19 @@ class Seq2Seq(torch.nn.Module):
         if self.shared_emb:
             self.embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
-                self.src_emb_dim,
-                padding_idx=0
+                self.src_emb_dim
             ).cuda()
             torch.nn.init.uniform(self.embedding.weight, -1.0, 1.0)
         else:
             self.src_embedding = torch.nn.Embedding(
                 self.src_vocab_size,
-                self.src_emb_dim,
-                padding_idx=0
+                self.src_emb_dim
             ).cuda()
             torch.nn.init.uniform(self.src_embedding.weight, -1.0, 1.0)
 
             self.trg_embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
-                self.trg_emb_dim,
-                padding_idx=0
+                self.trg_emb_dim
             ).cuda()
             torch.nn.init.uniform(self.trg_embedding.weight, -1.0, 1.0)
         # choose network
@@ -568,8 +575,12 @@ class Seq2Seq(torch.nn.Module):
             batch_size, self.src_hidden_dim)).cuda()
         hidden_attn = Variable(torch.zeros(
             batch_size, self.attn_hidden_dim)).cuda()
-        past_attn = Variable(torch.ones(
-            batch_size, src_seq_len)).cuda()
+        if self.coverage == 'norm':
+            past_attn = Variable(torch.ones(
+                batch_size, src_seq_len)).cuda()
+        else:
+            past_attn = Variable(torch.zeros(
+                batch_size, src_seq_len)).cuda()
         h_attn = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
         p_gen = Variable(torch.zeros(
@@ -656,8 +667,12 @@ class Seq2Seq(torch.nn.Module):
             batch_size, self.src_hidden_dim)).cuda()
         hidden_attn = Variable(torch.zeros(
             batch_size, self.attn_hidden_dim)).cuda()
-        past_attn = Variable(torch.ones(
-            batch_size, src_seq_len)).cuda()
+        if self.coverage == 'norm':
+            past_attn = Variable(torch.ones(
+                batch_size, src_seq_len)).cuda()
+        else:
+            past_attn = Variable(torch.zeros(
+                batch_size, src_seq_len)).cuda()
         h_attn = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
 
