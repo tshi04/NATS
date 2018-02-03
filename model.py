@@ -61,7 +61,7 @@ class AttentionBahdanau(torch.nn.Module):
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
         h_attn = torch.bmm(attn2, enhy).squeeze(1)
 
-        return h_attn, attn
+        return h_attn, attn, past_attn
 '''
 Luong, M. T., Pham, H., & Manning, C. D. (2015). 
 Effective approaches to attention-based neural machine translation. 
@@ -134,7 +134,7 @@ class AttentionLuong(torch.nn.Module):
         h_attn = self.attn_out(torch.cat((attn_enhy, dehy), 1))
         h_attn = F.tanh(h_attn)
 
-        return h_attn, attn
+        return h_attn, attn, past_attn
 '''
 LSTM decoder
 '''    
@@ -215,7 +215,7 @@ class LSTMDecoder(torch.nn.Module):
                 output_.append(hidden_[0])
         if self.attn_method[:8] == 'bahdanau':
             for k in range(input_.size(0)):
-                h_attn, attn = self.attn_layer(
+                h_attn, attn, past_attn = self.attn_layer(
                     hidden_[0], 
                     encoder_hy.transpose(0,1),
                     past_attn=past_attn
@@ -242,7 +242,7 @@ class LSTMDecoder(torch.nn.Module):
                 else:
                     x_input = input_[k]
                 hidden_ = self.lstm_(x_input, hidden_)
-                h_attn, attn = self.attn_layer(
+                h_attn, attn, past_attn = self.attn_layer(
                     hidden_[0], 
                     encoder_hy.transpose(0,1), 
                     past_attn=past_attn
@@ -359,7 +359,7 @@ class GRUDecoder(torch.nn.Module):
                 output_.append(hidden_)
         if self.attn_method[:8] == 'bahdanau':
             for k in range(input_.size(0)):
-                h_attn, attn = self.attn_layer(
+                h_attn, attn, past_attn = self.attn_layer(
                     hidden_, 
                     encoder_hy.transpose(0,1),
                     past_attn=past_attn
@@ -385,7 +385,7 @@ class GRUDecoder(torch.nn.Module):
                 else:
                     x_input = input_[k]
                 hidden_ = self.gru_(x_input, hidden_)
-                h_attn, attn = self.attn_layer(
+                h_attn, attn, past_attn = self.attn_layer(
                     hidden_, 
                     encoder_hy.transpose(0,1),
                     past_attn=past_attn
