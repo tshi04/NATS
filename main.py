@@ -47,7 +47,7 @@ parser.add_argument('--learning_rate', type=float, default=0.0001, help='learnin
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
 parser.add_argument('--checkpoint', type=int, default=500, help='How often you want to save model?')
-parser.add_argument('--continue_training', type=bool, default=False, help='Do you want to continue?')
+parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
 parser.add_argument('--nbestmodel', type=int, default=10, help='How many models you want to keep?')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
