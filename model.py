@@ -1,7 +1,7 @@
 '''
-Copyright 2017 @ Tian Shi
+Copyright 2018 @ Tian Shi
 @author Tian Shi
-Please contact tshi at vt dot edu.
+Please contact tshi@vt.edu
 '''
 import torch
 import torch.nn.functional as F
@@ -10,59 +10,9 @@ from torch.autograd import Variable
 Bahdanau, D., Cho, K., & Bengio, Y. (2014). 
 Neural machine translation by jointly learning to align and translate. 
 arXiv preprint arXiv:1409.0473.
-Coverage:
 See, A., Liu, P. J., & Manning, C. D. (2017). 
 Get To The Point: Summarization with Pointer-Generator Networks. 
 arXiv preprint arXiv:1704.04368.
-'''
-class AttentionBahdanau(torch.nn.Module):
-
-    def __init__(
-        self,
-        attn_hidden_size,
-        hidden_size,
-        attn_method,
-        coverage,
-    ):
-        super(AttentionBahdanau, self).__init__()   
-        self.attn_method = attn_method.lower()
-        self.coverage = coverage
-        self.hidden_size = hidden_size
-        self.attn_hidden_size = attn_hidden_size
-
-        if self.attn_method == 'bahdanau_concat':
-            self.attn_en_in = torch.nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias=True
-            ).cuda()
-            self.attn_de_in = torch.nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
-                bias=True
-            ).cuda()
-            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
-            self.attn_out = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
-                        
-    def forward(self, last_dehy, enhy, past_attn):
-
-        if self.attn_method == 'bahdanau_dot':
-            attn = torch.bmm(enhy, last_dehy.unsqueeze(2)).squeeze(2)
-        if self.attn_method[:15] == 'bahdanau_concat':
-            attn_agg = self.attn_en_in(enhy) + self.attn_de_in(last_dehy.unsqueeze(1))
-            if self.coverage == 'asee':
-                attn_agg = attn_agg + self.attn_cv_in(past_attn.unsqueeze(2))
-            attn = self.attn_out(F.tanh(attn_agg)).squeeze(2)
-            
-        if self.coverage == 'norm':
-            attn = torch.exp(attn) / past_attn
-
-        attn = F.softmax(attn, dim=1)
-        attn2 = attn.view(attn.size(0), 1, attn.size(1))
-        h_attn = torch.bmm(attn2, enhy).squeeze(1)
-
-        return h_attn, attn
-'''
 Luong, M. T., Pham, H., & Manning, C. D. (2015). 
 Effective approaches to attention-based neural machine translation. 
 arXiv preprint arXiv:1508.04025.
@@ -147,7 +97,6 @@ class LSTMDecoder(torch.nn.Module):
         num_layers,
         attn_method,
         coverage,
-        attn_as_input,
         batch_first,
         pointer_net
     ):
@@ -160,7 +109,6 @@ class LSTMDecoder(torch.nn.Module):
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
-        self.attn_as_input = attn_as_input
         self.pointer_net = pointer_net
         
         if self.attn_method == 'vanilla':
@@ -168,28 +116,11 @@ class LSTMDecoder(torch.nn.Module):
                 self.input_size, 
                 self.hidden_size
             ).cuda()
-        if self.attn_method[:8] == 'bahdanau':
+        if self.attn_method[:5] == 'luong':
             self.lstm_ = torch.nn.LSTMCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
             ).cuda()
-            self.attn_layer = AttentionBahdanau(
-                attn_hidden_size=self.attn_hidden_size,
-                hidden_size=self.hidden_size,
-                attn_method=self.attn_method,
-                coverage=self.coverage
-            ).cuda()
-        if self.attn_method[:5] == 'luong':
-            if self.attn_as_input:
-                self.lstm_ = torch.nn.LSTMCell(
-                    self.input_size+self.hidden_size, 
-                    self.hidden_size
-                ).cuda()
-            else:
-                self.lstm_ = torch.nn.LSTMCell(
-                    self.input_size,
-                    self.hidden_size
-                ).cuda()
             self.attn_layer = AttentionLuong(
                 attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
@@ -213,34 +144,11 @@ class LSTMDecoder(torch.nn.Module):
             for k in range(input_.size(0)):
                 hidden_ = self.lstm_(input_[k], hidden_)
                 output_.append(hidden_[0])
-        if self.attn_method[:8] == 'bahdanau':
-            for k in range(input_.size(0)):
-                h_attn, attn = self.attn_layer(
-                    hidden_[0], 
-                    encoder_hy.transpose(0,1),
-                    past_attn=past_attn
-                )
-                if self.coverage == 'asee':
-                    past_attn = past_attn + attn
-                if self.coverage == 'norm':
-                    if k == 0:
-                        past_attn = past_attn*0.0
-                    past_attn = past_attn + torch.exp(attn)
-                x_input = torch.cat((input_[k], h_attn), 1)
-                hidden_ = self.lstm_(x_input, hidden_)
-                output_.append(hidden_[0])
-                out_attn.append(attn)
-                if self.pointer_net:
-                    pt_input = torch.cat((input_[k], hidden_[0], h_attn), 1)
-                    p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
         if self.attn_method[:5] == 'luong':
             # luong need init h_attn
             batch_size = input_.size(1)
             for k in range(input_.size(0)):
-                if self.attn_as_input:
-                    x_input = torch.cat((input_[k], h_attn), 1)
-                else:
-                    x_input = input_[k]
+                x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.lstm_(x_input, hidden_)
                 h_attn, attn = self.attn_layer(
                     hidden_[0], 
@@ -259,7 +167,6 @@ class LSTMDecoder(torch.nn.Module):
                     pt_input = torch.cat((input_[k], hidden_[0], h_attn), 1)
                     p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
                     
-            
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
         output_ = torch.cat(output_, 0).view(
@@ -290,7 +197,6 @@ class GRUDecoder(torch.nn.Module):
         num_layers,
         attn_method,
         coverage,
-        attn_as_input,
         batch_first,
         pointer_net
     ):
@@ -303,7 +209,6 @@ class GRUDecoder(torch.nn.Module):
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
-        self.attn_as_input = attn_as_input
         self.pointer_net = pointer_net
         
         if self.attn_method == 'vanilla':
@@ -311,28 +216,11 @@ class GRUDecoder(torch.nn.Module):
                 self.input_size, 
                 self.hidden_size
             ).cuda()
-        if self.attn_method[:8] == 'bahdanau':
+        if self.attn_method[:5] == 'luong':
             self.gru_ = torch.nn.GRUCell(
                 self.input_size+self.hidden_size, 
                 self.hidden_size
             ).cuda()
-            self.attn_layer = AttentionBahdanau(
-                attn_hidden_size=self.attn_hidden_size,
-                hidden_size=self.hidden_size,
-                attn_method=self.attn_method,
-                coverage=self.coverage
-            ).cuda()
-        if self.attn_method[:5] == 'luong':
-            if self.attn_as_input:
-                self.gru_ = torch.nn.GRUCell(
-                    self.input_size+self.hidden_size, 
-                    self.hidden_size
-                ).cuda()
-            else:
-                self.gru_ = torch.nn.GRUCell(
-                    self.input_size, 
-                    self.hidden_size
-                ).cuda()
             self.attn_layer = AttentionLuong(
                 attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
@@ -357,33 +245,10 @@ class GRUDecoder(torch.nn.Module):
             for k in range(input_.size(0)):
                 hidden_ = self.gru_(input_[k], hidden_)
                 output_.append(hidden_)
-        if self.attn_method[:8] == 'bahdanau':
-            for k in range(input_.size(0)):
-                h_attn, attn = self.attn_layer(
-                    hidden_, 
-                    encoder_hy.transpose(0,1),
-                    past_attn=past_attn
-                )
-                if self.coverage == 'asee':
-                    past_attn = past_attn + attn
-                if self.coverage == 'norm':
-                    if k == 0:
-                        past_attn = past_attn*0.0
-                    past_attn = past_attn + torch.exp(attn)
-                x_input = torch.cat((input_[k], h_attn), 1)
-                hidden_ = self.gru_(x_input, hidden_)
-                output_.append(hidden_)
-                out_attn.append(attn)
-                if self.pointer_net:
-                    pt_input = torch.cat((input_[k], hidden_, h_attn), 1)
-                    p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
         if self.attn_method[:5] == 'luong':
             batch_size = input_.size(1)
             for k in range(input_.size(0)):
-                if self.attn_as_input:
-                    x_input = torch.cat((input_[k], h_attn), 1)
-                else:
-                    x_input = input_[k]
+                x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.gru_(x_input, hidden_)
                 h_attn, attn = self.attn_layer(
                     hidden_, 
@@ -441,9 +306,8 @@ class Seq2Seq(torch.nn.Module):
         dropout=0.0,
         attn_method='vanilla',
         coverage='vanilla',
-        network_='gru',
+        network_='lstm',
         pointer_net=True,
-        attn_as_input=True, # For Luong's method only
         shared_emb=True
     ):
         super(Seq2Seq, self).__init__()
@@ -465,7 +329,6 @@ class Seq2Seq(torch.nn.Module):
         self.network_ = network_.lower()
         self.pointer_net = pointer_net
         self.shared_emb = shared_emb
-        self.attn_as_input = attn_as_input
         
         self.src_num_directions = 1
         if self.src_bidirect:
@@ -511,7 +374,6 @@ class Seq2Seq(torch.nn.Module):
                 num_layers=self.trg_nlayer,
                 attn_method=self.attn_method,
                 coverage=self.coverage,
-                attn_as_input=self.attn_as_input,
                 batch_first=self.batch_first,
                 pointer_net=self.pointer_net
             ).cuda()
@@ -533,7 +395,6 @@ class Seq2Seq(torch.nn.Module):
                 num_layers=self.trg_nlayer,
                 attn_method=self.attn_method,
                 coverage=self.coverage,
-                attn_as_input=self.attn_as_input,
                 batch_first=self.batch_first,
                 pointer_net=self.pointer_net
             ).cuda()
@@ -549,10 +410,7 @@ class Seq2Seq(torch.nn.Module):
         ).cuda()
         
     def forward(self, input_src, input_trg):
-        # in this work, we did not consider the mask to the <pad> words.
-        # however, since we make the vector to 0, so that <pad> won't affect too much.
-        # Now there is no theoretical proof of it, but according to the results, the 
-        # peformance is good enough.
+        
         src_seq_len = input_src.size(1)
         trg_seq_len = input_trg.size(1)
         if self.shared_emb:
@@ -747,8 +605,6 @@ class Seq2Seq(torch.nn.Module):
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(
             trg_h.size(0) * trg_h.size(1), trg_h.size(2))
-        # here consume a lot of memory. output
-        # decoder_ouput is also logits in this code.
         decoder_output = self.decoder2vocab(trg_h_reshape)
         decoder_output = decoder_output.view(
             trg_h.size(0), trg_h.size(1), decoder_output.size(1))
