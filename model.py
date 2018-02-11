@@ -86,27 +86,27 @@ class AttentionLuong(torch.nn.Module):
             self.attn_en_in = torch.nn.Linear(
                 self.hidden_size,
                 self.hidden_size,
-                bias=False
+                bias=True
             ).cuda()
             self.attn_de_in = torch.nn.Linear(
                 self.hidden_size,
                 self.hidden_size,
-                bias=False
+                bias=True
             ).cuda()
-            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=True).cuda()
+            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=False).cuda()
             self.attn_warp_in = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
         if self.method == 'luong_general':
             self.attn_in = torch.nn.Linear(
                 self.hidden_size, 
                 self.hidden_size,
-                bias=True
+                bias=False
             ).cuda()
                 
         self.attn_out = torch.nn.Linear(
             self.hidden_size*2,
             self.hidden_size,
-            bias=False
-        ).cuda()      
+            bias=True
+        ).cuda() 
         
     def forward(self, dehy, enhy, past_attn):
         
