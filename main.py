@@ -37,11 +37,11 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='luong_concat',
+parser.add_argument('--attn_method', default='luong_general',
                     help='vanilla | luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='norm', help='vanilla | norm | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
-parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
+parser.add_argument('--pointer_net', type=bool, default=False, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
