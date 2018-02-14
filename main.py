@@ -55,12 +55,14 @@ parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
+parser.add_argument('--copy_words', type=bool, default=False, help='Do you want to copy words?')
 
 opt = parser.parse_args()
 
 if opt.pointer_net:
     opt.shared_embedding = True
+else:
+    opt.copy_words = False
 vocab2id, id2vocab = construct_vocab(
     file_=opt.data_dir+'/'+opt.file_vocab,
     max_size=opt.vocab_size,
@@ -321,15 +323,19 @@ if opt.task == 'fastbeam':
             network=opt.network_,
             pointer_net=opt.pointer_net
         )
-        trg_seq = trg_output_var.data.numpy()
-        for b in range(trg_seq.shape[0]):
-            arr = []
-            gen_text = beam_seq.data.cpu().numpy()[b,0]
-            gen_text = [id2vocab[wd] for wd in gen_text]
-            arr.append(' '.join(gen_text))
-            trg_text = [id2vocab[wd] for wd in trg_seq[b]]
-            arr.append(' '.join(trg_text))
-            fout.write('<sec>'.join(arr)+'\n')
+        if copy_words:
+            beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
+            beam_copy = beam_copy[:, :, 0].transpose(0, 1)
+        else:
+            trg_seq = trg_output_var.data.numpy()
+            for b in range(trg_seq.shape[0]):
+                arr = []
+                gen_text = beam_seq.data.cpu().numpy()[b,0]
+                gen_text = [id2vocab[wd] for wd in gen_text]
+                arr.append(' '.join(gen_text))
+                trg_text = [id2vocab[wd] for wd in trg_seq[b]]
+                arr.append(' '.join(trg_text))
+                fout.write('<sec>'.join(arr)+'\n')
 
         end_time = time.time()
         print(batch_id, end_time-start_time)
