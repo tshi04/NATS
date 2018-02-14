@@ -55,6 +55,8 @@ parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
+parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
+
 opt = parser.parse_args()
 
 if opt.pointer_net:

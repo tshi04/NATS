@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import time
+import torch.nn.functional as F
 from torch.autograd import Variable
 '''
 fast beam search
@@ -31,6 +32,7 @@ def fast_beam_search(
     beam_seq[:, :, 0] = vocab2id['<s>']
     beam_prb = torch.FloatTensor(batch_size, beam_size).fill_(0.0)
     last_wd = Variable(torch.LongTensor(batch_size, beam_size, 1).fill_(vocab2id['<s>'])).cuda()
+    beam_attn_ = 
     
     for j in range(max_len):
         if network == 'lstm':
@@ -49,6 +51,7 @@ def fast_beam_search(
                 encoder_hy,
                 past_attn_new
             )
+        print attn_.size()
         if pointer_net:
             logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
         else:
