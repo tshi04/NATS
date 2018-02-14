@@ -312,7 +312,7 @@ if opt.task == 'fastbeam':
             src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
             max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
         )
-        beam_seq, beam_prb = fast_beam_search(
+        beam_seq, beam_prb, beam_attn_ = fast_beam_search(
             model=model, 
             src_text=src_var, 
             vocab2id=vocab2id, 
