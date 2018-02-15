@@ -41,7 +41,7 @@ parser.add_argument('--attn_method', default='luong_general',
                     help='vanilla | luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='norm', help='vanilla | norm | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
-parser.add_argument('--pointer_net', type=bool, default=False, help='Use pointer network?')
+parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
@@ -55,7 +55,7 @@ parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--copy_words', type=bool, default=False, help='Do you want to copy words?')
+parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 
 opt = parser.parse_args()
 
@@ -323,9 +323,26 @@ if opt.task == 'fastbeam':
             network=opt.network_,
             pointer_net=opt.pointer_net
         )
-        if copy_words:
+        if opt.copy_words:
+            src_str, trg_str = process_minibatch_copyer(
+                batch_id=batch_id, path_=opt.data_dir, batch_size=opt.batch_size, 
+                max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
+            )
             beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
             beam_copy = beam_copy[:, :, 0].transpose(0, 1)
+            wdidx_copy = beam_copy.data.cpu().numpy()
+            for b in range(len(trg_str)):
+                arr = []
+                gen_text = beam_seq.data.cpu().numpy()[b,0]
+                gen_text = [id2vocab[wd] for wd in gen_text][1:]
+                for j in range(len(gen_text)):
+                    if gen_text[j] == '<unk>':
+                        gen_text[j] = src_str[b][wdidx_copy[b, j]]
+                        print b, j, src_str[b][wdidx_copy[b, j]]
+                arr.append(' '.join(gen_text))
+                trg_text = trg_str[b]
+                arr.append(' '.join(trg_text))
+                fout.write('<sec>'.join(arr)+'\n')
         else:
             trg_seq = trg_output_var.data.numpy()
             for b in range(trg_seq.shape[0]):
