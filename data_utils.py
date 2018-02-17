@@ -88,7 +88,7 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
-        dabs = filter(None, dabs)
+        dabs = ['<s>'] + filter(None, dabs) + ['</s>']
         trg_lens.append(len(dabs))
         
         dabs2id = [
