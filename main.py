@@ -79,7 +79,7 @@ if not opt.shared_embedding:
     )
     print 'The vocabulary size: {0}'.format(len(src_vocab2id))
 
-if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam' or opt.task == 'test':
+if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam':
     model = Seq2Seq(
         src_emb_dim=opt.src_emb_dim,
         trg_emb_dim=opt.trg_emb_dim,
