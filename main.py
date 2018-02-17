@@ -39,7 +39,7 @@ parser.add_argument('--shared_embedding', type=bool, default=True, help='source 
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 parser.add_argument('--attn_method', default='luong_general',
                     help='vanilla | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='norm', help='vanilla | norm | asee')
+parser.add_argument('--coverage', default='vanilla', help='vanilla | norm | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
@@ -338,7 +338,6 @@ if opt.task == 'fastbeam':
                 for j in range(len(gen_text)):
                     if gen_text[j] == '<unk>':
                         gen_text[j] = src_str[b][wdidx_copy[b, j]]
-                        print b, j, src_str[b][wdidx_copy[b, j]]
                 arr.append(' '.join(gen_text))
                 trg_text = trg_str[b]
                 arr.append(' '.join(trg_text))
@@ -381,7 +380,7 @@ if opt.task == 'rouge':
         rmm = [' '.join(filter(None, re.split('\s', sen))) for sen in rmm]
         smm = [' '.join(filter(None, re.split('\s', sen))) for sen in smm]
         rmm = filter(None, rmm)
-        smm = filter(None, smm)[:3]
+        smm = filter(None, smm)
         fout = open(os.path.join(sys_smm_path, 'sum.'+str(cnt).zfill(5)+'.txt'), 'w')
         for sen in rmm:
             arr = re.split('\s', sen)
