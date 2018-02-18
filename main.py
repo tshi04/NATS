@@ -39,7 +39,7 @@ parser.add_argument('--shared_embedding', type=bool, default=True, help='source 
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 parser.add_argument('--attn_method', default='luong_general',
                     help='vanilla | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='vanilla', help='vanilla | norm | asee')
+parser.add_argument('--coverage', default='asee', help='vanilla | romain | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
@@ -59,6 +59,8 @@ parser.add_argument('--copy_words', type=bool, default=True, help='Do you want t
 
 opt = parser.parse_args()
 
+if opt.coverage == 'asee' and opt.task == 'train':
+    opt.coverage = 'asee_train'
 if opt.pointer_net:
     opt.shared_embedding = True
 else:
@@ -159,7 +161,7 @@ if opt.task == 'train':
             src_var = src_var.cuda()
             trg_input_var = trg_input_var.cuda()
             trg_output_var = trg_output_var.cuda()
-            logits, attn_, p_gen = model(src_var, trg_input_var)
+            logits, attn_, p_gen, loss_cv = model(src_var, trg_input_var)
 
             if opt.pointer_net:
                 logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)
@@ -172,9 +174,12 @@ if opt.task == 'train':
             logits = torch.log(logits)
             loss = loss_criterion(
                 logits.contiguous().view(-1, len(vocab2id)),
-                trg_output_var.view(-1)
-            )
-
+                trg_output_var.view(-1))
+            
+            if opt.coverage == 'asee_train':
+                loss = loss + loss_cv
+                print loss_cv
+            
             optimizer.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm(model.parameters(), opt.grad_clip)

@@ -73,7 +73,7 @@ class AttentionLuong(torch.nn.Module):
             else:
                 attn = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
             
-        if self.coverage == 'norm':
+        if self.coverage == 'romain':
             attn = torch.exp(attn) / past_attn
         
         attn = F.softmax(attn, dim=1)
@@ -146,6 +146,7 @@ class LSTMDecoder(torch.nn.Module):
                 output_.append(hidden_[0])
         if self.attn_method[:5] == 'luong':
             # luong need init h_attn
+            loss_cv = 0.0
             batch_size = input_.size(1)
             for k in range(input_.size(0)):
                 x_input = torch.cat((input_[k], h_attn), 1)
@@ -155,9 +156,19 @@ class LSTMDecoder(torch.nn.Module):
                     encoder_hy.transpose(0,1), 
                     past_attn=past_attn
                 )
+                if self.coverage == 'asee_train':
+                    lscv = torch.cat((past_attn.unsqueeze(2), attn.unsqueeze(2)), 2)
+                    lscv = lscv.min(dim=2)[0]
+                    try:
+                        loss_cv = loss_cv + torch.mean(lscv)
+                    except:
+                        loss_cv = torch.mean(lscv)
+                    past_attn = past_attn + attn
+                    past_attn = F.softmax(past_attn)
                 if self.coverage == 'asee':
                     past_attn = past_attn + attn
-                if self.coverage == 'norm':
+                    past_attn = F.softmax(past_attn)
+                if self.coverage == 'romain':
                     if k == 0:
                         past_attn = past_attn*0.0
                     past_attn = past_attn + torch.exp(attn)
@@ -184,7 +195,7 @@ class LSTMDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
    
-        return output_, hidden_, h_attn, out_attn, past_attn, p_gen
+        return output_, hidden_, h_attn, out_attn, past_attn, p_gen, loss_cv
 '''
 GRU decoder
 '''
@@ -246,6 +257,7 @@ class GRUDecoder(torch.nn.Module):
                 hidden_ = self.gru_(input_[k], hidden_)
                 output_.append(hidden_)
         if self.attn_method[:5] == 'luong':
+            loss_cv = 0.0
             batch_size = input_.size(1)
             for k in range(input_.size(0)):
                 x_input = torch.cat((input_[k], h_attn), 1)
@@ -255,9 +267,19 @@ class GRUDecoder(torch.nn.Module):
                     encoder_hy.transpose(0,1),
                     past_attn=past_attn
                 )
+                if self.coverage == 'asee_train':
+                    lscv = torch.cat((past_attn.unsqueeze(2), attn.unsqueeze(2)), 2)
+                    lscv = lscv.min(dim=2)[0]
+                    try:
+                        loss_cv = loss_cv + torch.mean(lscv)
+                    except:
+                        loss_cv = torch.mean(lscv)
+                    past_attn = past_attn + attn
+                    past_attn = F.softmax(past_attn)
                 if self.coverage == 'asee':
                     past_attn = past_attn + attn
-                if self.coverage == 'norm':
+                    past_attn = F.softmax(past_attn)
+                if self.coverage == 'romain':
                     if k == 0:
                         past_attn = past_attn*0.0
                     past_attn = past_attn + torch.exp(attn)
@@ -284,7 +306,7 @@ class GRUDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
 
-        return output_, hidden_, h_attn, out_attn, past_attn, p_gen
+        return output_, hidden_, h_attn, out_attn, past_attn, p_gen, loss_cv
 '''
 sequence to sequence model
 ''' 
@@ -427,7 +449,7 @@ class Seq2Seq(torch.nn.Module):
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
-        if self.coverage == 'norm':
+        if self.coverage == 'romain':
             past_attn = Variable(torch.ones(
                 batch_size, src_seq_len)).cuda()
         else:
@@ -459,7 +481,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, (_, _), _, attn_, _, p_gen = self.decoder(
+            trg_h, (_, _), _, attn_, _, p_gen, loss_cv = self.decoder(
                 trg_emb,
                 (decoder_h0, decoder_c0),
                 h_attn,
@@ -481,7 +503,7 @@ class Seq2Seq(torch.nn.Module):
         
             encoder_hy = src_h.transpose(0,1)
         
-            trg_h, _, _, attn_, _, p_gen = self.decoder(
+            trg_h, _, _, attn_, _, p_gen, loss_cv = self.decoder(
                 trg_emb,
                 decoder_h0,
                 h_attn,
@@ -498,7 +520,7 @@ class Seq2Seq(torch.nn.Module):
         decoder_output = decoder_output.view(
             trg_h.size(0), trg_h.size(1), decoder_output.size(1))
 
-        return decoder_output, attn_, p_gen
+        return decoder_output, attn_, p_gen, loss_cv
     
     def forward_encoder(self, input_src):
         src_seq_len = input_src.size(1)
@@ -515,7 +537,7 @@ class Seq2Seq(torch.nn.Module):
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
-        if self.coverage == 'norm':
+        if self.coverage == 'romain':
             past_attn = Variable(torch.ones(
                 batch_size, src_seq_len)).cuda()
         else:
@@ -585,7 +607,7 @@ class Seq2Seq(torch.nn.Module):
         p_gen = Variable(torch.zeros(batch_size, 1)).cuda()
         
         if self.network_ == 'lstm':
-            trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen = self.decoder(
+            trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen, loss_cv = self.decoder(
                 trg_emb,
                 hidden_decoder,
                 h_attn,
@@ -594,7 +616,7 @@ class Seq2Seq(torch.nn.Module):
                 p_gen
             )
         if self.network_ == 'gru':
-            trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen = self.decoder(
+            trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen, loss_cv = self.decoder(
                 trg_emb,
                 hidden_decoder,
                 h_attn,
