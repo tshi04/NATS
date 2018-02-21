@@ -261,7 +261,7 @@ if opt.task == 'validate':
                     src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
                     max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
                 )
-                logits, attn_, p_gen = model(src_var.cuda(), trg_input_var.cuda())
+                logits, attn_, p_gen, _ = model(src_var.cuda(), trg_input_var.cuda())
                 if opt.pointer_net:
                     logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen, vocab2id)
                 else:
