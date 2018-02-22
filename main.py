@@ -380,7 +380,7 @@ if opt.task == 'rouge':
         smm = re.split('<pad>|<s>|</s>', arr[0])
         rmm = re.split('<pad>|<s>|</s>', arr[1])
         rmm = filter(None, rmm)
-        smm = filter(None, smm)
+        smm = filter(None, smm)[:1]
         rmm = [' '.join(filter(None, re.split('\s', sen))) for sen in rmm]
         smm = [' '.join(filter(None, re.split('\s', sen))) for sen in smm]
         rmm = filter(None, rmm)
