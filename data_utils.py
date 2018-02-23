@@ -11,11 +11,11 @@ from torch.autograd import Variable
 Construct the vocabulary
 '''
 def construct_vocab(file_, max_size=200000, mincount=5):
-    vocab2id = {'<s>': 2, '</s>': 3, '<pad>': 1, '<unk>': 0}
-    id2vocab = {2: '<s>', 3: '</s>', 1: '<pad>', 0: '<unk>'}
-    word_pad = {'<s>': 2, '</s>': 3, '<pad>': 1, '<unk>': 0}
+    vocab2id = {'<s>': 2, '</s>': 3, '<pad>': 1, '<unk>': 0, '<stop>': 4}
+    id2vocab = {2: '<s>', 3: '</s>', 1: '<pad>', 0: '<unk>', 4: '<stop>'}
+    word_pad = {'<s>': 2, '</s>': 3, '<pad>': 1, '<unk>': 0, '<stop>': 4}
     
-    cnt = 4
+    cnt = 5
     with open(file_, 'r') as fp:
         for line in fp:
             arr = re.split('\s', line[:-1])
@@ -79,6 +79,7 @@ def create_batch_file(path_, fkey_, file_, batch_size):
 Process the minibatch.
 '''
 def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id, max_lens=[400, 100]):
+    
     file_ = os.path.join(path_, 'batch_'+fkey_+'_'+str(batch_size), str(batch_id))
     fp = open(file_, 'r')
     src_arr = []
@@ -88,7 +89,7 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
-        dabs = ['<s>'] + filter(None, dabs) + ['</s>']
+        dabs = filter(None, dabs) + ['<stop>']
         trg_lens.append(len(dabs))
         
         dabs2id = [
@@ -134,38 +135,44 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id
     
     return src_var, trg_input_var, trg_output_var
 '''
-Process the minibatch without vocab
+Process the minibatch test
 '''
-def process_minibatch_copyer(batch_id, path_, batch_size, max_lens=[400, 100]):
+def process_minibatch_test(batch_id, path_, batch_size, vocab2id, src_lens):
     
     file_ = os.path.join(path_, 'batch_test_'+str(batch_size), str(batch_id))
     fp = open(file_, 'r')
     src_arr = []
+    src_idx = []
     trg_arr = []
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
         dabs = filter(None, dabs)
+        dabs = ' '.join(dabs)
         trg_arr.append(dabs)
         
         dart = re.split('\s', arr[1])
         dart = filter(None, dart)
+        dart2id = [
+            vocab2id[wd] if wd in vocab2id
+            else vocab2id['<unk>']
+            for wd in dart
+        ]
+        src_idx.append(dart2id)
         src_arr.append(dart)
     fp.close()
-    
-    src_max_lens = max_lens[0]
-    trg_max_lens = max_lens[1]
-            
-    src_arr = [itm[:src_max_lens] for itm in src_arr]
-    trg_arr = [itm[:trg_max_lens] for itm in trg_arr]
 
+    src_idx = [itm[:src_lens] for itm in src_idx]
+    src_idx = [
+        itm + [vocab2id['<pad>']]*(src_lens-len(itm))
+        for itm in src_idx
+    ]
+    src_var = Variable(torch.LongTensor(src_idx))
+    
+    src_arr = [itm[:src_lens] for itm in src_arr]
     src_arr = [
-        itm + ['<pad>']*(src_max_lens-len(itm))
+        itm + ['<pad>']*(src_lens-len(itm))
         for itm in src_arr
     ]
-    trg_arr = [
-        itm + ['<pad>']*(trg_max_lens-len(itm))
-        for itm in trg_arr
-    ]
-
-    return src_arr, trg_arr
+    
+    return src_var, src_arr, trg_arr

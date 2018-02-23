@@ -43,19 +43,19 @@ parser.add_argument('--coverage', default='vanilla', help='vanilla | romain | as
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
-parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
 parser.add_argument('--checkpoint', type=int, default=500, help='How often you want to save model?')
 parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
 parser.add_argument('--nbestmodel', type=int, default=10, help='How many models you want to keep?')
+parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_33_18000', help='file for model.')
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
+parser.add_argument('--copy_words', type=bool, default=False, help='Do you want to copy words?')
 
 opt = parser.parse_args()
 
@@ -312,14 +312,14 @@ if opt.task == 'fastbeam':
     start_time = time.time()
     fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
     for batch_id in range(test_batch):
-        src_var, trg_input_var, trg_output_var = process_minibatch(
-            batch_id=batch_id, path_=opt.data_dir, fkey_='test', 
-            batch_size=opt.batch_size,
-            src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
-            max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
+        src_var, src_arr, trg_arr = process_minibatch_test(
+            batch_id=batch_id, path_=opt.data_dir, 
+            batch_size=opt.batch_size, vocab2id=vocab2id, 
+            src_lens=opt.src_seq_lens
         )
+        src_var = src_var.cuda()
         beam_seq, beam_prb, beam_attn_ = fast_beam_search(
-            model=model, 
+            model=model,
             src_text=src_var, 
             vocab2id=vocab2id, 
             beam_size=opt.beam_size, 
@@ -328,33 +328,28 @@ if opt.task == 'fastbeam':
             pointer_net=opt.pointer_net
         )
         if opt.copy_words:
-            src_str, trg_str = process_minibatch_copyer(
-                batch_id=batch_id, path_=opt.data_dir, batch_size=opt.batch_size, 
-                max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
-            )
             beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
             beam_copy = beam_copy[:, :, 0].transpose(0, 1)
             wdidx_copy = beam_copy.data.cpu().numpy()
-            for b in range(len(trg_str)):
-                arr = []
-                gen_text = beam_seq.data.cpu().numpy()[b,0]
-                gen_text = [id2vocab[wd] for wd in gen_text][1:]
-                for j in range(len(gen_text)):
-                    if gen_text[j] == '<unk>':
-                        gen_text[j] = src_str[b][wdidx_copy[b, j]]
-                arr.append(' '.join(gen_text))
-                trg_text = trg_str[b]
-                arr.append(' '.join(trg_text))
-                fout.write('<sec>'.join(arr)+'\n')
-        else:
-            trg_seq = trg_output_var.data.numpy()
-            for b in range(trg_seq.shape[0]):
+            for b in range(len(trg_arr)):
                 arr = []
                 gen_text = beam_seq.data.cpu().numpy()[b,0]
                 gen_text = [id2vocab[wd] for wd in gen_text]
+                gen_text = gen_text[1:]
+                for j in range(len(gen_text)):
+                    if gen_text[j] == '<unk>':
+                        gen_text[j] = src_arr[b][wdidx_copy[b, j]]
                 arr.append(' '.join(gen_text))
-                trg_text = [id2vocab[wd] for wd in trg_seq[b]]
-                arr.append(' '.join(trg_text))
+                arr.append(trg_arr[b])
+                fout.write('<sec>'.join(arr)+'\n')
+        else:
+            for b in range(len(trg_arr)):
+                arr = []
+                gen_text = beam_seq.data.cpu().numpy()[b,0]
+                gen_text = [id2vocab[wd] for wd in gen_text]
+                gen_text = gen_text[1:]
+                arr.append(' '.join(gen_text))
+                arr.append(trg_arr[b])
                 fout.write('<sec>'.join(arr)+'\n')
 
         end_time = time.time()
@@ -377,13 +372,16 @@ if opt.task == 'rouge':
     cnt = 1
     for line in fp:
         arr = re.split('<sec>', line[:-1])
-        smm = re.split('<pad>|<s>|</s>', arr[0])
         rmm = re.split('<pad>|<s>|</s>', arr[1])
         rmm = filter(None, rmm)
-        smm = filter(None, smm)[:1]
         rmm = [' '.join(filter(None, re.split('\s', sen))) for sen in rmm]
-        smm = [' '.join(filter(None, re.split('\s', sen))) for sen in smm]
         rmm = filter(None, rmm)
+        
+        smm = re.split('<stop>', arr[0])
+        smm = filter(None, smm)
+        smm = re.split('<pad>|<s>|</s>', smm[0])
+        smm = filter(None, smm)
+        smm = [' '.join(filter(None, re.split('\s', sen))) for sen in smm]
         smm = filter(None, smm)
         fout = open(os.path.join(sys_smm_path, 'sum.'+str(cnt).zfill(5)+'.txt'), 'w')
         for sen in rmm:
