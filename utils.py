@@ -73,7 +73,7 @@ def fast_beam_search(
             h_attn_new = h_attn
             attn_new = attn_
             past_attn_new = past_attn
-            beam_attn_[j] = attn_new.view(batch_size, beam_size, attn_.size(-1))
+            beam_attn_[j] = attn_new.view(batch_size, beam_size, attn_new.size(-1))
             continue
 
         cand_seq = tensor_transformer(beam_seq, batch_size, beam_size)
