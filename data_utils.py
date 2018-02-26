@@ -143,6 +143,7 @@ def process_minibatch_test(batch_id, path_, batch_size, vocab2id, src_lens):
     fp = open(file_, 'r')
     src_arr = []
     src_idx = []
+    src_wt = []
     trg_arr = []
     for line in fp:
         arr = re.split('<sec>', line[:-1])
@@ -153,26 +154,23 @@ def process_minibatch_test(batch_id, path_, batch_size, vocab2id, src_lens):
         
         dart = re.split('\s', arr[1])
         dart = filter(None, dart)
-        dart2id = [
-            vocab2id[wd] if wd in vocab2id
-            else vocab2id['<unk>']
-            for wd in dart
-        ]
-        src_idx.append(dart2id)
         src_arr.append(dart)
+        dart2id = [vocab2id[wd] if wd in vocab2id else vocab2id['<unk>'] for wd in dart]
+        src_idx.append(dart2id)
+        dart2wt = [0.0 if wd in vocab2id else 1.0 for wd in dart]
+        src_wt.append(dart2wt)
     fp.close()
 
     src_idx = [itm[:src_lens] for itm in src_idx]
-    src_idx = [
-        itm + [vocab2id['<pad>']]*(src_lens-len(itm))
-        for itm in src_idx
-    ]
+    src_idx = [itm + [vocab2id['<pad>']]*(src_lens-len(itm)) for itm in src_idx]
     src_var = Variable(torch.LongTensor(src_idx))
     
-    src_arr = [itm[:src_lens] for itm in src_arr]
-    src_arr = [
-        itm + ['<pad>']*(src_lens-len(itm))
-        for itm in src_arr
-    ]
+    src_wt = [itm[:src_lens] for itm in src_wt]
+    src_wt = [itm + [0.0]*(src_lens-len(itm)) for itm in src_wt]
+    src_msk = Variable(torch.FloatTensor(src_wt))
     
-    return src_var, src_arr, trg_arr
+    src_arr = [itm[:src_lens] for itm in src_arr]
+    src_arr = [itm + ['<pad>']*(src_lens-len(itm)) for itm in src_arr]
+
+    return src_var, src_arr, src_msk, trg_arr
+

@@ -50,12 +50,12 @@ parser.add_argument('--nbestmodel', type=int, default=10, help='How many models 
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 # used in the test
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_33_18000', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_20_0', help='file for model.')
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--copy_words', type=bool, default=False, help='Do you want to copy words?')
+parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 
 opt = parser.parse_args()
 
@@ -312,11 +312,12 @@ if opt.task == 'fastbeam':
     start_time = time.time()
     fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
     for batch_id in range(test_batch):
-        src_var, src_arr, trg_arr = process_minibatch_test(
+        src_var, src_arr, src_msk, trg_arr = process_minibatch_test(
             batch_id=batch_id, path_=opt.data_dir, 
             batch_size=opt.batch_size, vocab2id=vocab2id, 
             src_lens=opt.src_seq_lens
         )
+        src_msk = src_msk.cuda()
         src_var = src_var.cuda()
         beam_seq, beam_prb, beam_attn_ = fast_beam_search(
             model=model,
@@ -327,6 +328,9 @@ if opt.task == 'fastbeam':
             network=opt.network_,
             pointer_net=opt.pointer_net
         )
+        src_msk = src_msk.repeat(1, opt.beam_size).view(
+            opt.batch_size, opt.beam_size, opt.src_seq_lens).unsqueeze(0)
+        beam_attn_ = beam_attn_*src_msk
         if opt.copy_words:
             beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
             beam_copy = beam_copy[:, :, 0].transpose(0, 1)
