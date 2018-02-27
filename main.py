@@ -247,8 +247,6 @@ if opt.task == 'validate':
                 model.load_state_dict(torch.load(fl_))
             else:
                 continue
-            if opt.val_num_batch > val_batch:
-                opt.val_num_batch = val_batch
             val_batch = create_batch_file(
                 path_=opt.data_dir,
                 fkey_='validate',
@@ -256,6 +254,8 @@ if opt.task == 'validate':
                 batch_size=opt.batch_size
             )
             print 'The number of batches (test): {0}'.format(val_batch)
+            if opt.val_num_batch > val_batch:
+                opt.val_num_batch = val_batch
             for batch_id in range(opt.val_num_batch):
                 src_var, trg_input_var, trg_output_var = process_minibatch(
                     batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
