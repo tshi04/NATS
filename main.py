@@ -53,9 +53,10 @@ parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory 
 parser.add_argument('--model_file', default='seq2seq_20_0', help='file for model.')
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
+parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
+parser.add_argument('--val_num_batch', type=int, default=100, help='beam size.')
 
 opt = parser.parse_args()
 
@@ -254,7 +255,9 @@ if opt.task == 'validate':
                 model.load_state_dict(torch.load(fl_))
             else:
                 continue
-            for batch_id in range(val_batch):
+            if opt.val_num_batch > val_batch:
+                opt.val_num_batch = val_batch
+            for batch_id in range(opt.val_num_batch):
                 src_var, trg_input_var, trg_output_var = process_minibatch(
                     batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
                     batch_size=opt.batch_size,
@@ -274,7 +277,7 @@ if opt.task == 'validate':
                 )
             
                 losses.append(loss.data.cpu().numpy()[0])
-                if batch_id%100 == 0:
+                if batch_id%10 == 0:
                     print batch_id,
             print
             losses = np.array(losses)

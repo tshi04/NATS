@@ -49,7 +49,7 @@ def create_batch_file(path_, fkey_, file_, batch_size):
     for line in fp:
         corpus_arr.append(line)
     fp.close()
-    if fkey_ == 'train':
+    if fkey_ == 'train' or fkey_== 'validate':
         random.shuffle(corpus_arr)
         
     cnt = 0
