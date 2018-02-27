@@ -241,7 +241,7 @@ if opt.task == 'validate':
     while 1:
         model_para_files = []
         model_para_files = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.model'))
-        model_para_files = sorted(model_para_files)
+        model_para_files = sorted(model_para_files)[::-1]
         
         for fl_ in model_para_files:
             best_model = {itm[0]: itm[1] for itm in best_arr}
