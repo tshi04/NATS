@@ -37,7 +37,7 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='luong_concat',
+parser.add_argument('--attn_method', default='luong_general',
                     help='vanilla | luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='vanilla', help='vanilla | romain | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
@@ -56,7 +56,7 @@ parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--val_num_batch', type=int, default=100, help='beam size.')
+parser.add_argument('--val_num_batch', type=int, default=200, help='beam size.')
 
 opt = parser.parse_args()
 
@@ -217,15 +217,7 @@ if opt.task == 'train':
 '''
 validate
 '''
-if opt.task == 'validate':
-    val_batch = create_batch_file(
-        path_=opt.data_dir,
-        fkey_='validate',
-        file_=opt.file_val,
-        batch_size=opt.batch_size
-    )
-    print 'The number of batches (test): {0}'.format(val_batch)
-    
+if opt.task == 'validate':   
     weight_mask = torch.ones(len(vocab2id)).cuda()
     weight_mask[vocab2id['<pad>']] = 0
     loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
@@ -244,7 +236,7 @@ if opt.task == 'validate':
         model_para_files = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.model'))
         model_para_files = sorted(model_para_files)[::-1]
         
-        for fl_ in model_para_files:
+        for fl_ in model_para_files:           
             best_model = {itm[0]: itm[1] for itm in best_arr}
             if fl_ in best_model:
                 continue
@@ -257,6 +249,13 @@ if opt.task == 'validate':
                 continue
             if opt.val_num_batch > val_batch:
                 opt.val_num_batch = val_batch
+            val_batch = create_batch_file(
+                path_=opt.data_dir,
+                fkey_='validate',
+                file_=opt.file_val,
+                batch_size=opt.batch_size
+            )
+            print 'The number of batches (test): {0}'.format(val_batch)
             for batch_id in range(opt.val_num_batch):
                 src_var, trg_input_var, trg_output_var = process_minibatch(
                     batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
