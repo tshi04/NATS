@@ -278,18 +278,18 @@ if opt.task == 'validate':
                 losses.append(loss.data.cpu().numpy()[0])
                 if batch_id%10 == 0:
                     print batch_id,
+                del logits, attn_, p_gen, _
             print
             losses = np.array(losses)
             end_time = time.time()
             best_arr.append([fl_, np.average(losses), end_time-start_time])
-            for itm in best_arr:
+            for itm in best_arr[:opt.nbestmodel]:
                 print 'model={0}, loss={1}, time={2}'.format(itm[0], itm[1], itm[2])
             
             best_arr = sorted(best_arr, key=lambda bb: bb[1])
             for itm in best_arr[opt.nbestmodel:]:
                 if os.path.exists(itm[0]):
                     os.unlink(itm[0])
-            best_arr = best_arr[:opt.nbestmodel]
             fout = open(val_file, 'w')
             for itm in best_arr:
                 if len(itm) == 0:
