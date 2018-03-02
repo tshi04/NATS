@@ -37,9 +37,9 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='luong_general',
+parser.add_argument('--attn_method', default='luong_concat',
                     help='vanilla | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='vanilla', help='vanilla | romain | asee')
+parser.add_argument('--coverage', default='romain', help='vanilla | romain | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
@@ -56,7 +56,7 @@ parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 # used in validation
 parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--val_num_batch', type=int, default=200, help='beam size.')
+parser.add_argument('--val_num_batch', type=int, default=200, help='how many batches')
 
 opt = parser.parse_args()
 
