@@ -174,12 +174,10 @@ class LSTMDecoder(torch.nn.Module):
             batch_size, 
             hidden_size
         )
-        if not self.attn_method == 'vanilla':
-            out_attn = torch.cat(out_attn, 0).view(
-                len_seq,
-                attn.size(0),
-                attn.size(1),
-            )
+        out_attn = torch.cat(out_attn, 0).view(
+            len_seq,
+            attn.size(0),
+            attn.size(1))
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
@@ -279,12 +277,10 @@ class GRUDecoder(torch.nn.Module):
             batch_size, 
             hidden_size
         )
-        if not self.attn_method == 'vanilla':
-            out_attn = torch.cat(out_attn, 0).view(
-                len_seq,
-                attn.size(0),
-                attn.size(1),
-            )
+        out_attn = torch.cat(out_attn, 0).view(
+            len_seq,
+            attn.size(0),
+            attn.size(1))
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
@@ -345,20 +341,17 @@ class Seq2Seq(torch.nn.Module):
         if self.shared_emb:
             self.embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
-                self.src_emb_dim
-            ).cuda()
+                self.src_emb_dim).cuda()
             torch.nn.init.uniform(self.embedding.weight, -1.0, 1.0)
         else:
             self.src_embedding = torch.nn.Embedding(
                 self.src_vocab_size,
-                self.src_emb_dim
-            ).cuda()
+                self.src_emb_dim).cuda()
             torch.nn.init.uniform(self.src_embedding.weight, -1.0, 1.0)
 
             self.trg_embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
-                self.trg_emb_dim
-            ).cuda()
+                self.trg_emb_dim).cuda()
             torch.nn.init.uniform(self.trg_embedding.weight, -1.0, 1.0)
         # choose network
         if self.network_ == 'lstm':
@@ -369,8 +362,7 @@ class Seq2Seq(torch.nn.Module):
                 num_layers=self.src_nlayer,
                 batch_first=self.batch_first,
                 dropout=self.dropout,
-                bidirectional=self.src_bidirect
-            ).cuda()
+                bidirectional=self.src_bidirect).cuda()
             # decoder
             self.decoder = LSTMDecoder(
                 attn_hidden_size=self.attn_hidden_dim,
@@ -380,8 +372,7 @@ class Seq2Seq(torch.nn.Module):
                 attn_method=self.attn_method,
                 coverage=self.coverage,
                 batch_first=self.batch_first,
-                pointer_net=self.pointer_net
-            ).cuda()
+                pointer_net=self.pointer_net).cuda()
         elif self.network_ == 'gru':
             # encoder
             self.encoder = torch.nn.GRU(
@@ -390,8 +381,7 @@ class Seq2Seq(torch.nn.Module):
                 num_layers=self.src_nlayer,
                 batch_first=self.batch_first,
                 dropout=self.dropout,
-                bidirectional=self.src_bidirect
-            ).cuda()
+                bidirectional=self.src_bidirect).cuda()
             # decoder
             self.decoder = GRUDecoder(
                 attn_hidden_size=self.attn_hidden_dim,
@@ -401,19 +391,16 @@ class Seq2Seq(torch.nn.Module):
                 attn_method=self.attn_method,
                 coverage=self.coverage,
                 batch_first=self.batch_first,
-                pointer_net=self.pointer_net
-            ).cuda()
+                pointer_net=self.pointer_net).cuda()
         # encoder to decoder
         self.encoder2decoder = torch.nn.Linear(
             self.src_hidden_dim*self.src_num_directions,
-            self.trg_hidden_dim
-        ).cuda()
+            self.trg_hidden_dim).cuda()
         # decoder to vocab
         self.decoder2vocab = torch.nn.Linear(
             self.trg_hidden_dim,
             self.trg_vocab_size,
-            bias=True
-        ).cuda()
+            bias=True).cuda()
         
     def forward(self, input_src, input_trg):
         
@@ -472,8 +459,7 @@ class Seq2Seq(torch.nn.Module):
                 h_attn,
                 encoder_hy,
                 past_attn,
-                p_gen
-            )
+                p_gen)
         elif self.network_ == 'gru':
             src_h, src_h_t = self.encoder(
                 src_emb, h0_encoder)
@@ -495,8 +481,7 @@ class Seq2Seq(torch.nn.Module):
                 h_attn,
                 encoder_hy,
                 past_attn,
-                p_gen
-            )
+                p_gen)
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(
             trg_h.size(0) * trg_h.size(1), trg_h.size(2))
@@ -539,8 +524,7 @@ class Seq2Seq(torch.nn.Module):
 
             src_h, (src_h_t, src_c_t) = self.encoder(
                 src_emb, 
-                (h0_encoder, c0_encoder)
-            )
+                (h0_encoder, c0_encoder))
 
             if self.src_bidirect:
                 h_t = torch.cat((src_h_t[-1], src_h_t[-2]), 1)
@@ -601,8 +585,7 @@ class Seq2Seq(torch.nn.Module):
                 h_attn,
                 encoder_hy,
                 past_attn,
-                p_gen
-            )
+                p_gen)
         if self.network_ == 'gru':
             trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen, loss_cv = self.decoder(
                 idx,
@@ -611,8 +594,7 @@ class Seq2Seq(torch.nn.Module):
                 h_attn,
                 encoder_hy,
                 past_attn,
-                p_gen
-            )
+                p_gen)
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(
             trg_h.size(0) * trg_h.size(1), trg_h.size(2))
