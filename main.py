@@ -297,7 +297,6 @@ if opt.task == 'validate':
             best_arr = sorted(best_arr, key=lambda bb: bb[1])
             for itm in best_arr[opt.nbestmodel:]:
                 tarr = re.split('_|\.', itm[0])
-                print tarr
                 if tarr[-2] == '0':
                     continue
                 if os.path.exists(itm[0]):
@@ -309,7 +308,7 @@ if opt.task == 'validate':
                 fout.write(' '.join([itm[0], str(itm[1]), str(itm[2])])+'\n')
             fout.close()
 '''
-fastbeam
+beam
 '''
 if opt.task == 'beam':
     test_batch = create_batch_file(
