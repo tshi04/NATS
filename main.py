@@ -60,8 +60,6 @@ parser.add_argument('--val_num_batch', type=int, default=200, help='how many bat
 
 opt = parser.parse_args()
 
-if opt.coverage == 'asee' and opt.task == 'train':
-    opt.coverage = 'asee_train'
 if opt.pointer_net:
     opt.shared_embedding = True
 else:

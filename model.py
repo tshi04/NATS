@@ -16,6 +16,9 @@ arXiv preprint arXiv:1704.04368.
 Luong, M. T., Pham, H., & Manning, C. D. (2015). 
 Effective approaches to attention-based neural machine translation. 
 arXiv preprint arXiv:1508.04025.
+Paulus, R., Xiong, C., & Socher, R. (2017). 
+A deep reinforced model for abstractive summarization. 
+arXiv preprint arXiv:1705.04304.
 '''
 class AttentionLuong(torch.nn.Module):
     
@@ -36,28 +39,19 @@ class AttentionLuong(torch.nn.Module):
             self.attn_en_in = torch.nn.Linear(
                 self.hidden_size,
                 self.hidden_size,
-                bias=False
-            ).cuda()
+                bias=True).cuda()
             self.attn_de_in = torch.nn.Linear(
                 self.hidden_size,
                 self.hidden_size,
-                bias=False
-            ).cuda()
+                bias=False).cuda()
             self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=False).cuda()
             self.attn_warp_in = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
         if self.method == 'luong_general':
             self.attn_in = torch.nn.Linear(
                 self.hidden_size, 
                 self.hidden_size,
-                bias=False
-            ).cuda()
-                
-        self.attn_out = torch.nn.Linear(
-            self.hidden_size*2,
-            self.hidden_size,
-            bias=False
-        ).cuda() 
-        
+                bias=False).cuda()
+
     def forward(self, dehy, enhy, past_attn):
         
         if self.method == 'luong_concat':
@@ -65,26 +59,26 @@ class AttentionLuong(torch.nn.Module):
             if self.coverage == 'asee':
                 attn_agg = attn_agg + self.attn_cv_in(past_attn.unsqueeze(2))
             attn_agg = F.tanh(attn_agg)
-            attn = self.attn_warp_in(attn_agg).squeeze(2)
+            attn_ee = self.attn_warp_in(attn_agg).squeeze(2)
         else:
             if self.method == 'luong_general':
                 enhy_new = self.attn_in(enhy)
-                attn = torch.bmm(enhy_new, dehy.unsqueeze(2)).squeeze(2)
+                attn_ee = torch.bmm(enhy_new, dehy.unsqueeze(2)).squeeze(2)
             else:
-                attn = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
+                attn_ee = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
             
         if self.coverage == 'romain':
-            attn = torch.exp(attn) / past_attn
-        
-        attn = F.softmax(attn, dim=1)
+            attn_ee = torch.exp(attn_ee)
+            attn = attn_ee / past_attn
+            nm = torch.norm(attn, 1, 1).unsqueeze(1)
+            attn = attn / nm
+        else:
+            attn = F.softmax(attn_ee, dim=1)
+            
         attn2 = attn.view(attn.size(0), 1, attn.size(1))
-
-        attn_enhy = torch.bmm(attn2, enhy).squeeze(1)
+        c_encoder = torch.bmm(attn2, enhy).squeeze(1)
         
-        h_attn = self.attn_out(torch.cat((attn_enhy, dehy), 1))
-        h_attn = F.tanh(h_attn)
-
-        return h_attn, attn
+        return c_encoder, attn, attn_ee
 '''
 LSTM decoder
 '''    
@@ -127,12 +121,18 @@ class LSTMDecoder(torch.nn.Module):
                 attn_method=self.attn_method, 
                 coverage=self.coverage
             ).cuda()
+            
+        self.attn_out = torch.nn.Linear(
+            self.hidden_size*2,
+            self.hidden_size,
+            bias=True
+        ).cuda()
         
         if self.pointer_net:
             self.pt_out = torch.nn.Linear(
                 self.input_size+self.hidden_size*2, 1).cuda()
         
-    def forward(self, input_, hidden_, h_attn, encoder_hy, past_attn, p_gen):
+    def forward(self, idx, input_, hidden_, h_attn, encoder_hy, past_attn, p_gen):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -151,12 +151,12 @@ class LSTMDecoder(torch.nn.Module):
             for k in range(input_.size(0)):
                 x_input = torch.cat((input_[k], h_attn), 1)
                 hidden_ = self.lstm_(x_input, hidden_)
-                h_attn, attn = self.attn_layer(
+                c_encoder, attn, attn_ee = self.attn_layer(
                     hidden_[0], 
-                    encoder_hy.transpose(0,1), 
-                    past_attn=past_attn
-                )
-                if self.coverage == 'asee_train':
+                    encoder_hy.transpose(0,1),
+                    past_attn=past_attn)
+                h_attn = self.attn_out(torch.cat((c_encoder, hidden_[0]), 1))
+                if self.coverage == 'asee':
                     lscv = torch.cat((past_attn.unsqueeze(2), attn.unsqueeze(2)), 2)
                     lscv = lscv.min(dim=2)[0]
                     try:
@@ -164,18 +164,14 @@ class LSTMDecoder(torch.nn.Module):
                     except:
                         loss_cv = torch.mean(lscv)
                     past_attn = past_attn + attn
-                    past_attn = F.softmax(past_attn)
-                if self.coverage == 'asee':
-                    past_attn = past_attn + attn
-                    past_attn = F.softmax(past_attn)
                 if self.coverage == 'romain':
-                    if k == 0:
+                    if k + idx == 0:
                         past_attn = past_attn*0.0
-                    past_attn = past_attn + torch.exp(attn)
+                    past_attn = past_attn + attn_ee
                 output_.append(h_attn)
                 out_attn.append(attn)
                 if self.pointer_net:
-                    pt_input = torch.cat((input_[k], hidden_[0], h_attn), 1)
+                    pt_input = torch.cat((input_[k], hidden_[0], c_encoder), 1)
                     p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
                     
         len_seq = input_.size(0)
@@ -428,7 +424,8 @@ class Seq2Seq(torch.nn.Module):
         # decoder to vocab
         self.decoder2vocab = torch.nn.Linear(
             self.trg_hidden_dim,
-            self.trg_vocab_size
+            self.trg_vocab_size,
+            bias=True
         ).cuda()
         
     def forward(self, input_src, input_trg):
@@ -482,6 +479,7 @@ class Seq2Seq(torch.nn.Module):
             encoder_hy = src_h.transpose(0,1)
         
             trg_h, (_, _), _, attn_, _, p_gen, loss_cv = self.decoder(
+                0,
                 trg_emb,
                 (decoder_h0, decoder_c0),
                 h_attn,
