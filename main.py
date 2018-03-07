@@ -14,7 +14,7 @@ from utils import *
 from data_utils import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--task', default='train', help='train | validate | rouge | fastbeam')
+parser.add_argument('--task', default='train', help='train | validate | rouge | beam')
 parser.add_argument('--data_dir', default='../sum_data/', help='directory that store the data.')
 parser.add_argument('--file_vocab', default='vocab', help='file store training vocabulary.')
 parser.add_argument('--file_corpus', default='train.txt', help='file store training documents.')
@@ -37,33 +37,35 @@ parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder 
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
 parser.add_argument('--shared_embedding', type=bool, default=True, help='source / target share embedding?')
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
-parser.add_argument('--attn_method', default='luong_concat',
-                    help='vanilla | luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='romain', help='vanilla | romain | asee')
+
+parser.add_argument('--attn_method', default='luong_concat', help='luong_dot | luong_concat | luong_general')
+parser.add_argument('--coverage', default='asee', help='vanilla | temporal | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
+
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
-parser.add_argument('--checkpoint', type=int, default=500, help='How often you want to save model?')
-parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
+parser.add_argument('--checkpoint', type=int, default=300, help='How often you want to save model?')
 parser.add_argument('--nbestmodel', type=int, default=10, help='How many models you want to keep?')
+parser.add_argument('--val_num_batch', type=int, default=200, help='how many batches')
+parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
-# used in the test
-parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_20_0', help='file for model.')
 parser.add_argument('--file_test', default='test.txt', help='test data')
+parser.add_argument('--file_val', default='val.txt', help='val data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
-# used in validation
-parser.add_argument('--file_val', default='val.txt', help='test data')
-parser.add_argument('--val_num_batch', type=int, default=200, help='how many batches')
+parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
+parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
 
 opt = parser.parse_args()
 
+if opt.coverage == 'asee' and opt.task == 'train':
+    opt.coverage = 'asee_train'
 if opt.pointer_net:
     opt.shared_embedding = True
 else:
     opt.copy_words = False
+    opt.coverage = 'vanilla'
 vocab2id, id2vocab = construct_vocab(
     file_=opt.data_dir+'/'+opt.file_vocab,
     max_size=opt.vocab_size,
@@ -80,7 +82,7 @@ if not opt.shared_embedding:
     )
     print 'The vocabulary size: {0}'.format(len(src_vocab2id))
 
-if opt.task == 'train' or opt.task == 'validate' or opt.task == 'fastbeam':
+if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
     model = Seq2Seq(
         src_emb_dim=opt.src_emb_dim,
         trg_emb_dim=opt.trg_emb_dim,
@@ -111,7 +113,7 @@ if opt.task == 'train':
     loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.learning_rate)
-
+    # read the last check point and continue training
     uf_model = [0, -1]
     if opt.continue_training:
         out_dir = os.path.join(opt.data_dir, opt.model_dir)
@@ -134,7 +136,7 @@ if opt.task == 'train':
             if not os.path.exists(out_dir):
                 break
         os.mkdir(out_dir)
-
+    # train models
     losses = []
     start_time = time.time()
     cclb = 0
@@ -161,7 +163,7 @@ if opt.task == 'train':
             trg_input_var = trg_input_var.cuda()
             trg_output_var = trg_output_var.cuda()
             logits, attn_, p_gen, loss_cv = model(src_var, trg_input_var)
-
+            # use the pointer generator loss
             if opt.pointer_net:
                 logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)
             else:
@@ -184,7 +186,11 @@ if opt.task == 'train':
             optimizer.step()
         
             end_time = time.time()
-            losses.append([epoch, batch_id, loss.data.cpu().numpy()[0], (end_time-start_time)/3600.0])
+            losses.append([
+                epoch, batch_id, 
+                loss.data.cpu().numpy()[0], 
+                loss_cv.data.cpu().numpy()[0], 
+                (end_time-start_time)/3600.0])
             if batch_id%opt.checkpoint == 0:
                 loss_np = np.array(losses)
                 np.save(out_dir+'/loss', loss_np)
@@ -194,13 +200,16 @@ if opt.task == 'train':
             if batch_id%1 == 0:
                 end_time = time.time()
                 sen_pred = [id2vocab[x] for x in word_prob[0]]
-                print 'epoch={0} batch={1} loss={2}, time_escape={3}s={4}h'.format(
-                    epoch, batch_id, loss.data.cpu().numpy()[0], 
+                print 'epoch={0}, batch={1}, loss={2}, loss_cv={3}, time_escape={4}s={5}h'.format(
+                    epoch, batch_id, 
+                    loss.data.cpu().numpy()[0], 
+                    loss_cv.data.cpu().numpy()[0],
                     end_time-start_time, (end_time-start_time)/3600.0
                 )
                 print ' '.join(sen_pred)
             if opt.debug:
                 break
+            del logits, attn_, p_gen, loss_cv, loss
         if opt.debug:
             break
         
@@ -261,7 +270,7 @@ if opt.task == 'validate':
                     src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
                     max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
                 )
-                logits, attn_, p_gen, _ = model(src_var.cuda(), trg_input_var.cuda())
+                logits, attn_, p_gen, loss_cv = model(src_var.cuda(), trg_input_var.cuda())
                 if opt.pointer_net:
                     logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen, vocab2id)
                 else:
@@ -272,11 +281,12 @@ if opt.task == 'validate':
                     logits.contiguous().view(-1, len(vocab2id)),
                     trg_output_var.view(-1).cuda()
                 )
-            
+                
+                loss = loss + loss_cv
                 losses.append(loss.data.cpu().numpy()[0])
                 if batch_id%10 == 0:
                     print batch_id,
-                del logits, attn_, p_gen, _
+                del logits, attn_, p_gen, loss_cv, loss
             print
             losses = np.array(losses)
             end_time = time.time()
@@ -286,6 +296,10 @@ if opt.task == 'validate':
             
             best_arr = sorted(best_arr, key=lambda bb: bb[1])
             for itm in best_arr[opt.nbestmodel:]:
+                tarr = re.split('_|\.', itm[0])
+                print tarr
+                if tarr[-2] == '0':
+                    continue
                 if os.path.exists(itm[0]):
                     os.unlink(itm[0])
             fout = open(val_file, 'w')
@@ -297,7 +311,7 @@ if opt.task == 'validate':
 '''
 fastbeam
 '''
-if opt.task == 'fastbeam':
+if opt.task == 'beam':
     test_batch = create_batch_file(
         path_=opt.data_dir,
         fkey_='test',

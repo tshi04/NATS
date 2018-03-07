@@ -38,6 +38,7 @@ def fast_beam_search(
     for j in range(max_len):
         if network == 'lstm':
             logits, (h0, c0), h_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
+                j,
                 last_wd.view(-1, 1), 
                 (h0_new, c0_new),
                 h_attn_new,
@@ -46,6 +47,7 @@ def fast_beam_search(
             )
         else:
             logits, hidden_decoder, h_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
+                j,
                 last_wd.view(-1, 1), 
                 hidden_decoder_new,
                 h_attn_new, 
