@@ -24,7 +24,6 @@ class AttentionLuong(torch.nn.Module):
     
     def __init__(
         self,
-        attn_hidden_size,
         hidden_size,
         attn_method,
         coverage,
@@ -33,7 +32,66 @@ class AttentionLuong(torch.nn.Module):
         self.method = attn_method.lower()
         self.hidden_size = hidden_size
         self.coverage = coverage
-        self.attn_hidden_size = attn_hidden_size
+        
+        if self.method == 'luong_concat':
+            self.attn_en_in = torch.nn.Linear(
+                self.hidden_size,
+                self.hidden_size,
+                bias=True).cuda()
+            self.attn_de_in = torch.nn.Linear(
+                self.hidden_size,
+                self.hidden_size,
+                bias=False).cuda()
+            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=False).cuda()
+            self.attn_warp_in = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
+        if self.method == 'luong_general':
+            self.attn_in = torch.nn.Linear(
+                self.hidden_size, 
+                self.hidden_size,
+                bias=False).cuda()
+
+    def forward(self, dehy, enhy, past_attn):
+        
+        if self.method == 'luong_concat':
+            attn_agg = self.attn_en_in(enhy) + self.attn_de_in(dehy.unsqueeze(1))
+            if self.coverage[:4] == 'asee':
+                attn_agg = attn_agg + self.attn_cv_in(past_attn.unsqueeze(2))
+            attn_agg = F.tanh(attn_agg)
+            attn_ee = self.attn_warp_in(attn_agg).squeeze(2)
+        else:
+            if self.method == 'luong_general':
+                enhy_new = self.attn_in(enhy)
+                attn_ee = torch.bmm(enhy_new, dehy.unsqueeze(2)).squeeze(2)
+            else:
+                attn_ee = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
+            
+        if self.coverage == 'temporal':
+            attn_ee = torch.exp(attn_ee)
+            attn = attn_ee / past_attn
+            nm = torch.norm(attn, 1, 1).unsqueeze(1)
+            attn = attn / nm
+        else:
+            attn = F.softmax(attn_ee, dim=1)
+            
+        attn2 = attn.unsqueeze(1)
+        c_encoder = torch.bmm(attn2, enhy).squeeze(1)
+        
+        return c_encoder, attn, attn_ee
+'''
+Intra-decoder
+'''
+class AttentionDecoder(torch.nn.Module):
+    
+    def __init__(
+        self,
+        hidden_size,
+        attn_method,
+        coverage,
+    ):
+        super(AttentionLuong, self).__init__()
+        self.method = attn_method.lower()
+        self.hidden_size = hidden_size
+        self.coverage = coverage
         
         if self.method == 'luong_concat':
             self.attn_en_in = torch.nn.Linear(
@@ -85,7 +143,6 @@ LSTM decoder
 class LSTMDecoder(torch.nn.Module):
     def __init__(
         self,
-        attn_hidden_size,
         input_size, # embedding size
         hidden_size, # h size
         num_layers,
@@ -96,7 +153,6 @@ class LSTMDecoder(torch.nn.Module):
     ):
         super(LSTMDecoder, self).__init__()
         # parameters
-        self.attn_hidden_size = attn_hidden_size
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.n_layer = num_layers
@@ -114,7 +170,6 @@ class LSTMDecoder(torch.nn.Module):
                 self.input_size+self.hidden_size, 
                 self.hidden_size).cuda()
             self.attn_layer = AttentionLuong(
-                attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method, 
                 coverage=self.coverage).cuda()
@@ -189,7 +244,6 @@ GRU decoder
 class GRUDecoder(torch.nn.Module):
     def __init__(
         self,
-        attn_hidden_size,
         input_size,
         hidden_size,
         num_layers,
@@ -200,7 +254,6 @@ class GRUDecoder(torch.nn.Module):
     ):
         super(GRUDecoder, self).__init__()
         # parameters
-        self.attn_hidden_size = attn_hidden_size
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.n_layer = num_layers
@@ -218,7 +271,6 @@ class GRUDecoder(torch.nn.Module):
                 self.input_size+self.hidden_size, 
                 self.hidden_size).cuda()
             self.attn_layer = AttentionLuong(
-                attn_hidden_size=self.attn_hidden_size,
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method,
                 coverage=self.coverage).cuda()
@@ -297,7 +349,6 @@ class Seq2Seq(torch.nn.Module):
         trg_emb_dim=128,
         src_hidden_dim=256,
         trg_hidden_dim=256,
-        attn_hidden_dim=256,
         src_vocab_size=999,
         trg_vocab_size=999,
         src_nlayer=2,
@@ -317,7 +368,6 @@ class Seq2Seq(torch.nn.Module):
         self.trg_emb_dim = trg_emb_dim
         self.src_hidden_dim = src_hidden_dim
         self.trg_hidden_dim = trg_hidden_dim
-        self.attn_hidden_dim = attn_hidden_dim
         self.src_vocab_size = src_vocab_size
         self.trg_vocab_size = trg_vocab_size
         self.src_nlayer = src_nlayer
@@ -365,7 +415,6 @@ class Seq2Seq(torch.nn.Module):
                 bidirectional=self.src_bidirect).cuda()
             # decoder
             self.decoder = LSTMDecoder(
-                attn_hidden_size=self.attn_hidden_dim,
                 input_size=self.trg_emb_dim,
                 hidden_size=self.trg_hidden_dim,
                 num_layers=self.trg_nlayer,
@@ -384,7 +433,6 @@ class Seq2Seq(torch.nn.Module):
                 bidirectional=self.src_bidirect).cuda()
             # decoder
             self.decoder = GRUDecoder(
-                attn_hidden_size=self.attn_hidden_dim,
                 input_size=self.trg_emb_dim,
                 hidden_size=self.trg_hidden_dim,
                 num_layers=self.trg_nlayer,

@@ -26,7 +26,6 @@ parser.add_argument('--src_emb_dim', type=int, default=128, help='source embeddi
 parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embedding dimension')
 parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
 parser.add_argument('--trg_hidden_dim', type=int, default=256, help='decoder hidden dimension')
-parser.add_argument('--attn_hidden_dim', type=int, default=128, help='attn hidden dimension')
 parser.add_argument('--src_num_layers', type=int, default=1, help='encoder number layers')
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
@@ -88,7 +87,6 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
         trg_emb_dim=opt.trg_emb_dim,
         src_hidden_dim=opt.src_hidden_dim,
         trg_hidden_dim=opt.trg_hidden_dim,
-        attn_hidden_dim=opt.attn_hidden_dim,
         src_vocab_size=len(src_vocab2id),
         trg_vocab_size=len(vocab2id),
         src_nlayer=opt.src_num_layers,
