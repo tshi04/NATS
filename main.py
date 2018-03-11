@@ -342,7 +342,7 @@ if opt.task == 'beam':
             pointer_net=opt.pointer_net
         )
         src_msk = src_msk.repeat(1, opt.beam_size).view(
-            opt.batch_size, opt.beam_size, opt.src_seq_lens).unsqueeze(0)
+            src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
         beam_attn_ = beam_attn_*src_msk
         if opt.copy_words:
             beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
