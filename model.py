@@ -20,7 +20,7 @@ See, A., Liu, P. J., & Manning, C. D. (2017).
 Get To The Point: Summarization with Pointer-Generator Networks. 
 arXiv preprint arXiv:1704.04368.
 '''
-class AttentionLuong(torch.nn.Module):
+class AttentionEncoder(torch.nn.Module):
     
     def __init__(
         self,
@@ -28,7 +28,7 @@ class AttentionLuong(torch.nn.Module):
         attn_method,
         coverage,
     ):
-        super(AttentionLuong, self).__init__()
+        super(AttentionEncoder, self).__init__()
         self.method = attn_method.lower()
         self.hidden_size = hidden_size
         self.coverage = coverage
@@ -85,13 +85,11 @@ class AttentionDecoder(torch.nn.Module):
     def __init__(
         self,
         hidden_size,
-        attn_method,
-        coverage,
+        attn_method
     ):
-        super(AttentionLuong, self).__init__()
+        super(AttentionDecoder, self).__init__()
         self.method = attn_method.lower()
         self.hidden_size = hidden_size
-        self.coverage = coverage
         
         if self.method == 'luong_concat':
             self.attn_en_in = torch.nn.Linear(
@@ -102,7 +100,6 @@ class AttentionDecoder(torch.nn.Module):
                 self.hidden_size,
                 self.hidden_size,
                 bias=False).cuda()
-            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=False).cuda()
             self.attn_warp_in = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
         if self.method == 'luong_general':
             self.attn_in = torch.nn.Linear(
@@ -114,8 +111,6 @@ class AttentionDecoder(torch.nn.Module):
         
         if self.method == 'luong_concat':
             attn_agg = self.attn_en_in(enhy) + self.attn_de_in(dehy.unsqueeze(1))
-            if self.coverage[:4] == 'asee':
-                attn_agg = attn_agg + self.attn_cv_in(past_attn.unsqueeze(2))
             attn_agg = F.tanh(attn_agg)
             attn_ee = self.attn_warp_in(attn_agg).squeeze(2)
         else:
@@ -124,15 +119,9 @@ class AttentionDecoder(torch.nn.Module):
                 attn_ee = torch.bmm(enhy_new, dehy.unsqueeze(2)).squeeze(2)
             else:
                 attn_ee = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
-            
-        if self.coverage == 'temporal':
-            attn_ee = torch.exp(attn_ee)
-            attn = attn_ee / past_attn
-            nm = torch.norm(attn, 1, 1).unsqueeze(1)
-            attn = attn / nm
-        else:
-            attn = F.softmax(attn_ee, dim=1)
-            
+        attn_ee = torch.exp(attn_ee)
+        attn = attn_ee / past_attn
+
         attn2 = attn.unsqueeze(1)
         c_encoder = torch.bmm(attn2, enhy).squeeze(1)
         
@@ -149,7 +138,8 @@ class LSTMDecoder(torch.nn.Module):
         attn_method,
         coverage,
         batch_first,
-        pointer_net
+        pointer_net,
+        intra_decoder
     ):
         super(LSTMDecoder, self).__init__()
         # parameters
@@ -160,30 +150,35 @@ class LSTMDecoder(torch.nn.Module):
         self.attn_method = attn_method.lower()
         self.coverage = coverage
         self.pointer_net = pointer_net
+        self.intra_decoder = intra_decoder
         
-        if self.attn_method == 'vanilla':
-            self.lstm_ = torch.nn.LSTMCell(
-                self.input_size, 
-                self.hidden_size).cuda()
-        if self.attn_method[:5] == 'luong':
-            self.lstm_ = torch.nn.LSTMCell(
-                self.input_size+self.hidden_size, 
-                self.hidden_size).cuda()
-            self.attn_layer = AttentionLuong(
-                hidden_size=self.hidden_size,
-                attn_method=self.attn_method, 
-                coverage=self.coverage).cuda()
+        self.lstm_ = torch.nn.LSTMCell(
+            self.input_size+self.hidden_size, 
+            self.hidden_size).cuda()
+        self.encoder_attn_layer = AttentionEncoder(
+            hidden_size=self.hidden_size,
+            attn_method=self.attn_method, 
+            coverage=self.coverage).cuda()
             
         self.attn_out = torch.nn.Linear(
             self.hidden_size*2,
             self.hidden_size,
             bias=True).cuda()
         
+        if self.intra_decoder:
+            self.decoder_attn_layer = AttentionDecoder(
+                hidden_size=self.hidden_size,
+                attn_method=self.attn_method).cuda()
+        
         if self.pointer_net:
             self.pt_out = torch.nn.Linear(
                 self.input_size+self.hidden_size*2, 1).cuda()
         
-    def forward(self, idx, input_, hidden_, h_attn, encoder_hy, past_attn, p_gen):
+    def forward(
+        self, idx, input_, hidden_, 
+        h_attn, encoder_hy, 
+        past_attn, p_gen, 
+        de_h_attn, de_past_attn):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -197,7 +192,7 @@ class LSTMDecoder(torch.nn.Module):
         for k in range(input_.size(0)):
             x_input = torch.cat((input_[k], h_attn), 1)
             hidden_ = self.lstm_(x_input, hidden_)
-            c_encoder, attn, attn_ee = self.attn_layer(
+            c_encoder, attn, attn_ee = self.encoder_attn_layer(
                 hidden_[0], 
                 encoder_hy.transpose(0,1),
                 past_attn=past_attn)
@@ -215,6 +210,8 @@ class LSTMDecoder(torch.nn.Module):
                 if k + idx == 0:
                     past_attn = past_attn*0.0
                 past_attn = past_attn + attn_ee
+            if self.intra_decoder:
+                
                 
             output_.append(h_attn)
             out_attn.append(attn)
@@ -250,7 +247,8 @@ class GRUDecoder(torch.nn.Module):
         attn_method,
         coverage,
         batch_first,
-        pointer_net
+        pointer_net,
+        intra_decoder
     ):
         super(GRUDecoder, self).__init__()
         # parameters
@@ -261,30 +259,34 @@ class GRUDecoder(torch.nn.Module):
         self.attn_method = attn_method.lower()
         self.coverage = coverage
         self.pointer_net = pointer_net
+        self.intra_decoder = intra_decoder
         
-        if self.attn_method == 'vanilla':
-            self.gru_ = torch.nn.GRUCell(
-                self.input_size, 
-                self.hidden_size).cuda()
-        if self.attn_method[:5] == 'luong':
-            self.gru_ = torch.nn.GRUCell(
-                self.input_size+self.hidden_size, 
-                self.hidden_size).cuda()
-            self.attn_layer = AttentionLuong(
-                hidden_size=self.hidden_size,
-                attn_method=self.attn_method,
-                coverage=self.coverage).cuda()
+        self.gru_ = torch.nn.GRUCell(
+            self.input_size+self.hidden_size, 
+            self.hidden_size).cuda()
+        self.encoder_attn_layer = AttentionEncoder(
+            hidden_size=self.hidden_size,
+            attn_method=self.attn_method,
+            coverage=self.coverage).cuda()
             
         self.attn_out = torch.nn.Linear(
             self.hidden_size*2,
             self.hidden_size,
             bias=True).cuda()
         
+        if self.intra_decoder:
+            self.decoder_attn_layer = AttentionDecoder(
+                hidden_size=self.hidden_size,
+                attn_method=self.attn_method).cuda()
         if self.pointer_net:
             self.pt_out = torch.nn.Linear(
                 self.input_size+self.hidden_size*2, 1).cuda()
             
-    def forward(self, idx, input_, hidden_, h_attn, encoder_hy, past_attn, p_gen):
+    def forward(
+        self, idx, input_, hidden_, 
+        h_attn, encoder_hy, 
+        past_attn, p_gen, 
+        de_h_attn, de_past_attn):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -298,7 +300,7 @@ class GRUDecoder(torch.nn.Module):
         for k in range(input_.size(0)):
             x_input = torch.cat((input_[k], h_attn), 1)
             hidden_ = self.gru_(x_input, hidden_)
-            c_encoder, attn, attn_ee = self.attn_layer(
+            c_encoder, attn, attn_ee = self.encoder_attn_layer(
                 hidden_, 
                 encoder_hy.transpose(0,1),
                 past_attn=past_attn)
