@@ -79,6 +79,10 @@ class AttentionEncoder(torch.nn.Module):
         return c_encoder, attn, attn_ee
 '''
 Intra-decoder
+
+Paulus, R., Xiong, C., & Socher, R. (2017). 
+A deep reinforced model for abstractive summarization. 
+arXiv preprint arXiv:1705.04304.
 '''
 class AttentionDecoder(torch.nn.Module):
     
@@ -107,23 +111,23 @@ class AttentionDecoder(torch.nn.Module):
                 self.hidden_size,
                 bias=False).cuda()
 
-    def forward(self, dehy, enhy, past_attn):
+    def forward(self, dehy, oldhy, past_attn_de):
         
         if self.method == 'luong_concat':
-            attn_agg = self.attn_en_in(enhy) + self.attn_de_in(dehy.unsqueeze(1))
+            attn_agg = self.attn_en_in(oldhy) + self.attn_de_in(dehy.unsqueeze(1))
             attn_agg = F.tanh(attn_agg)
             attn_ee = self.attn_warp_in(attn_agg).squeeze(2)
         else:
             if self.method == 'luong_general':
-                enhy_new = self.attn_in(enhy)
-                attn_ee = torch.bmm(enhy_new, dehy.unsqueeze(2)).squeeze(2)
+                oldhy_new = self.attn_in(oldhy)
+                attn_ee = torch.bmm(oldhy_new, dehy.unsqueeze(2)).squeeze(2)
             else:
-                attn_ee = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
+                attn_ee = torch.bmm(oldhy, dehy.unsqueeze(2)).squeeze(2)
         attn_ee = torch.exp(attn_ee)
-        attn = attn_ee / past_attn
+        attn = attn_ee / past_attn_de
 
         attn2 = attn.unsqueeze(1)
-        c_encoder = torch.bmm(attn2, enhy).squeeze(1)
+        c_encoder = torch.bmm(attn2, oldhy).squeeze(1)
         
         return c_encoder, attn, attn_ee
 '''
@@ -139,7 +143,7 @@ class LSTMDecoder(torch.nn.Module):
         coverage,
         batch_first,
         pointer_net,
-        intra_decoder
+        attn_decoder
     ):
         super(LSTMDecoder, self).__init__()
         # parameters
@@ -150,11 +154,21 @@ class LSTMDecoder(torch.nn.Module):
         self.attn_method = attn_method.lower()
         self.coverage = coverage
         self.pointer_net = pointer_net
-        self.intra_decoder = intra_decoder
+        self.attn_decoder = attn_decoder
         
-        self.lstm_ = torch.nn.LSTMCell(
-            self.input_size+self.hidden_size, 
-            self.hidden_size).cuda()
+        if self.attn_decoder:
+            self.lstm_ = torch.nn.LSTMCell(
+                self.input_size+self.hidden_size+self.hidden_size, 
+                self.hidden_size).cuda()
+            
+            self.decoder_attn_layer = AttentionDecoder(
+                hidden_size=self.hidden_size,
+                attn_method=self.attn_method).cuda()
+        else:
+            self.lstm_ = torch.nn.LSTMCell(
+                self.input_size+self.hidden_size, 
+                self.hidden_size).cuda()
+            
         self.encoder_attn_layer = AttentionEncoder(
             hidden_size=self.hidden_size,
             attn_method=self.attn_method, 
@@ -164,12 +178,7 @@ class LSTMDecoder(torch.nn.Module):
             self.hidden_size*2,
             self.hidden_size,
             bias=True).cuda()
-        
-        if self.intra_decoder:
-            self.decoder_attn_layer = AttentionDecoder(
-                hidden_size=self.hidden_size,
-                attn_method=self.attn_method).cuda()
-        
+
         if self.pointer_net:
             self.pt_out = torch.nn.Linear(
                 self.input_size+self.hidden_size*2, 1).cuda()
@@ -178,7 +187,7 @@ class LSTMDecoder(torch.nn.Module):
         self, idx, input_, hidden_, 
         h_attn, encoder_hy, 
         past_attn, p_gen, 
-        de_h_attn, de_past_attn):
+        h_attn_de, past_attn_de):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -190,11 +199,13 @@ class LSTMDecoder(torch.nn.Module):
         loss_cv = Variable(torch.zeros(1)).cuda()
         batch_size = input_.size(1)
         for k in range(input_.size(0)):
-            x_input = torch.cat((input_[k], h_attn), 1)
+            if self.attn_decoder:
+                x_input = torch.cat((input_[k], h_attn, h_attn_de), 1)
+            else:
+                x_input = torch.cat((input_[k], h_attn), 1)
             hidden_ = self.lstm_(x_input, hidden_)
             c_encoder, attn, attn_ee = self.encoder_attn_layer(
-                hidden_[0], 
-                encoder_hy.transpose(0,1),
+                hidden_[0], encoder_hy.transpose(0,1),
                 past_attn=past_attn)
             h_attn = self.attn_out(torch.cat((c_encoder, hidden_[0]), 1))
             if self.coverage == 'asee_train':
@@ -210,8 +221,8 @@ class LSTMDecoder(torch.nn.Module):
                 if k + idx == 0:
                     past_attn = past_attn*0.0
                 past_attn = past_attn + attn_ee
-            if self.intra_decoder:
-                
+            if self.attn_decoder:
+                pass
                 
             output_.append(h_attn)
             out_attn.append(attn)
@@ -248,7 +259,7 @@ class GRUDecoder(torch.nn.Module):
         coverage,
         batch_first,
         pointer_net,
-        intra_decoder
+        attn_decoder
     ):
         super(GRUDecoder, self).__init__()
         # parameters
@@ -259,7 +270,7 @@ class GRUDecoder(torch.nn.Module):
         self.attn_method = attn_method.lower()
         self.coverage = coverage
         self.pointer_net = pointer_net
-        self.intra_decoder = intra_decoder
+        self.attn_decoder = attn_decoder
         
         self.gru_ = torch.nn.GRUCell(
             self.input_size+self.hidden_size, 
@@ -274,7 +285,7 @@ class GRUDecoder(torch.nn.Module):
             self.hidden_size,
             bias=True).cuda()
         
-        if self.intra_decoder:
+        if self.attn_decoder:
             self.decoder_attn_layer = AttentionDecoder(
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method).cuda()
@@ -361,9 +372,9 @@ class Seq2Seq(torch.nn.Module):
         attn_method='vanilla',
         coverage='vanilla',
         network_='lstm',
-        pointer_net=True,
+        pointer_net=False,
         shared_emb=True,
-        attn_decoder=True
+        attn_decoder=False
     ):
         super(Seq2Seq, self).__init__()
         # parameters
@@ -384,14 +395,12 @@ class Seq2Seq(torch.nn.Module):
         self.pointer_net = pointer_net
         self.shared_emb = shared_emb
         self.attn_decoder = attn_decoder
-        
+        # bidirection encoder
         self.src_num_directions = 1
         if self.src_bidirect:
             self.src_hidden_dim = src_hidden_dim // 2
             self.src_num_directions = 2
-        
         # source embedding and target embedding
-        # the same for summarization.
         if self.shared_emb:
             self.embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
@@ -402,12 +411,11 @@ class Seq2Seq(torch.nn.Module):
                 self.src_vocab_size,
                 self.src_emb_dim).cuda()
             torch.nn.init.uniform(self.src_embedding.weight, -1.0, 1.0)
-
             self.trg_embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
                 self.trg_emb_dim).cuda()
             torch.nn.init.uniform(self.trg_embedding.weight, -1.0, 1.0)
-        # choose network
+        # network structure
         if self.network_ == 'lstm':
             # encoder
             self.encoder = torch.nn.LSTM(
@@ -459,9 +467,10 @@ class Seq2Seq(torch.nn.Module):
             bias=True).cuda()
         
     def forward(self, input_src, input_trg):
-        
+        # parameters
         src_seq_len = input_src.size(1)
         trg_seq_len = input_trg.size(1)
+        # embedding
         if self.shared_emb:
             src_emb = self.embedding(input_src)
             trg_emb = self.embedding(input_trg)
@@ -472,7 +481,7 @@ class Seq2Seq(torch.nn.Module):
         batch_size = input_src.size(1)
         if self.batch_first:
             batch_size = input_src.size(0)
-
+        # Variables
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
@@ -486,13 +495,12 @@ class Seq2Seq(torch.nn.Module):
             batch_size, self.trg_hidden_dim)).cuda()
         p_gen = Variable(torch.zeros(
             batch_size, trg_seq_len)).cuda()
-        
+        ## decoder attention
         h_attn_de = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
-        past_attn_de = Variable(torch.ones(
+        past_attn_de = Variable(torch.zeros(
             batch_size, trg_seq_len)).cuda()
-            
-        
+        # encoder
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
                 self.encoder.num_layers*self.src_num_directions,
