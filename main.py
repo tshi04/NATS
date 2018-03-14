@@ -49,7 +49,7 @@ parser.add_argument('--checkpoint', type=int, default=200, help='How often you w
 parser.add_argument('--nbestmodel', type=int, default=20, help='How many models you want to keep?')
 parser.add_argument('--val_num_batch', type=int, default=100, help='how many batches')
 parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
-parser.add_argument('--debug', type=bool, default=True, help='if true will clean the output after training')
+parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--file_val', default='val.txt', help='val data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')

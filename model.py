@@ -246,8 +246,7 @@ class LSTMDecoder(torch.nn.Module):
         output_ = torch.cat(output_, 0).view(
             len_seq, 
             batch_size, 
-            hidden_size
-        )
+            hidden_size)
         out_attn = torch.cat(out_attn, 0).view(
             len_seq,
             attn.size(0),
@@ -290,43 +289,64 @@ class GRUDecoder(torch.nn.Module):
             hidden_size=self.hidden_size,
             attn_method=self.attn_method,
             coverage=self.coverage).cuda()
-            
-        self.attn_out = torch.nn.Linear(
-            self.hidden_size*2,
-            self.hidden_size,
-            bias=True).cuda()
         
         if self.attn_decoder:
             self.decoder_attn_layer = AttentionDecoder(
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method).cuda()
+            self.attn_out = torch.nn.Linear(
+                self.hidden_size*3,
+                self.hidden_size,
+                bias=True).cuda()
+        else:
+            self.attn_out = torch.nn.Linear(
+                self.hidden_size*2,
+                self.hidden_size,
+                bias=True).cuda()
+
         if self.pointer_net:
             self.pt_out = torch.nn.Linear(
                 self.input_size+self.hidden_size*2, 1).cuda()
             
     def forward(
-        self, idx, input_, hidden_, 
-        h_attn, encoder_hy, 
-        past_attn, p_gen, 
-        de_h_attn, de_past_attn):
+        self, idx, input_, hidden_, h_attn, 
+        encoder_hy, past_attn, p_gen):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
-            
         batch_size = input_.size(1)
         
         output_ = []
         out_attn = []
+        oldhy_arr = []
+        
         loss_cv = Variable(torch.zeros(1)).cuda()
         batch_size = input_.size(1)
         for k in range(input_.size(0)):
             x_input = torch.cat((input_[k], h_attn), 1)
             hidden_ = self.gru_(x_input, hidden_)
+            # attention encoder
             c_encoder, attn, attn_ee = self.encoder_attn_layer(
-                hidden_, 
-                encoder_hy,
-                past_attn=past_attn)
-            h_attn = self.attn_out(torch.cat((c_encoder, hidden_), 1))
+                hidden_, encoder_hy, past_attn)
+            # attention decoder
+            if self.attn_decoder:
+                if k + idx == 0:
+                    c_decoder = Variable(torch.zeros(
+                        batch_size, self.hidden_size)).cuda()
+                else:
+                    c_decoder, attn_de = self.decoder_attn_layer(
+                        hidden_, oldhy)
+                oldhy_arr.append(hidden_)
+                if k + idx == 0:
+                    oldhy = torch.cat(oldhy_arr, 0).unsqueeze(1)
+                else:
+                    oldhy = torch.cat(oldhy_arr, 0).view(
+                        len(oldhy_arr), batch_size, self.hidden_size)
+                    oldhy = oldhy.transpose(0, 1)
+                h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_), 1))
+            else:
+                h_attn = self.attn_out(torch.cat((c_encoder, hidden_), 1))
+            # coverage
             if self.coverage == 'asee_train':
                 lscv = torch.cat((past_attn.unsqueeze(2), attn.unsqueeze(2)), 2)
                 lscv = lscv.min(dim=2)[0]
@@ -337,9 +357,10 @@ class GRUDecoder(torch.nn.Module):
             if self.coverage[:4] == 'asee':
                 past_attn = past_attn + attn
             if self.coverage == 'temporal':
-                if k == 0:
+                if k + idx == 0:
                     past_attn = past_attn*0.0
                 past_attn = past_attn + attn_ee
+            # output
             output_.append(h_attn)
             out_attn.append(attn)
             if self.pointer_net:
@@ -351,8 +372,7 @@ class GRUDecoder(torch.nn.Module):
         output_ = torch.cat(output_, 0).view(
             len_seq, 
             batch_size, 
-            hidden_size
-        )
+            hidden_size)
         out_attn = torch.cat(out_attn, 0).view(
             len_seq,
             attn.size(0),
