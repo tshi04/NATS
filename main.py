@@ -39,7 +39,7 @@ parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 
 parser.add_argument('--attn_method', default='luong_general', help='luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='temporal', help='vanilla | temporal | asee')
-parser.add_argument('--network_', default='gru', help='gru | lstm')
+parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--attn_decoder', type=bool, default=True, help='attention decoder?')
 

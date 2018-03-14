@@ -212,9 +212,9 @@ class LSTMDecoder(torch.nn.Module):
                 de_idx = past_dehy.size(0)
                 if k + idx == 0:
                     past_dehy = hidden_[0].unsqueeze(0)
-                    past_dehy = past_dehy.tranpose(0, 1) # batch*seqL*hidden
+                    past_dehy = past_dehy.transpose(0, 1) # batch*seqL*hidden
                 else:
-                    past_dehy = past_dehy.view(-1, self.hidden_size) # seqL*batch**hidden
+                    past_dehy = past_dehy.contiguous().view(-1, self.hidden_size) # seqL*batch**hidden
                     past_dehy = torch.cat((past_dehy, hidden_[0]), 0) # (seqL+1)*batch**hidden
                     past_dehy = past_dehy.view(de_idx+1, batch_size, self.hidden_size) # (seqL+1)*batch*hidden
                     past_dehy = past_dehy.transpose(0, 1) # batch*(seqL+1)*hidden
