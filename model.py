@@ -124,7 +124,6 @@ class AttentionDecoder(torch.nn.Module):
             else:
                 attn = torch.bmm(oldhy, dehy.unsqueeze(2)).squeeze(2)
         attn = F.softmax(attn, dim=1)
-        print attn.size()
 
         attn2 = attn.unsqueeze(1)
         c_decoder = torch.bmm(attn2, oldhy).squeeze(1)
@@ -136,8 +135,8 @@ LSTM decoder
 class LSTMDecoder(torch.nn.Module):
     def __init__(
         self,
-        input_size, # embedding size
-        hidden_size, # h size
+        input_size,
+        hidden_size,
         num_layers,
         attn_method,
         coverage,
@@ -159,7 +158,6 @@ class LSTMDecoder(torch.nn.Module):
         self.lstm_ = torch.nn.LSTMCell(
             self.input_size+self.hidden_size, 
             self.hidden_size).cuda()
-        
         self.encoder_attn_layer = AttentionEncoder(
             hidden_size=self.hidden_size,
             attn_method=self.attn_method, 
@@ -169,7 +167,6 @@ class LSTMDecoder(torch.nn.Module):
             self.decoder_attn_layer = AttentionDecoder(
                 hidden_size=self.hidden_size,
                 attn_method=self.attn_method).cuda()
-            
             self.attn_out = torch.nn.Linear(
                 self.hidden_size*3,
                 self.hidden_size,
@@ -201,23 +198,28 @@ class LSTMDecoder(torch.nn.Module):
         for k in range(input_.size(0)):
             x_input = torch.cat((input_[k], h_attn), 1)
             hidden_ = self.lstm_(x_input, hidden_)
+            # attention encoder
             c_encoder, attn, attn_ee = self.encoder_attn_layer(
                 hidden_[0], encoder_hy, past_attn)
+            # attention decoder
             if self.attn_decoder:
-                if k + idx > 0:
+                if k + idx == 0:
+                    c_decoder = Variable(torch.zeros(
+                        batch_size, self.hidden_size)).cuda()
+                else:
                     c_decoder, attn_de = self.decoder_attn_layer(
                         hidden_[0], oldhy)
-                else:
-                    c_decoder = Variable(torch.zeros(batch_size, self.hidden_size)).cuda()
                 oldhy_arr.append(hidden_[0])
                 if k + idx == 0:
                     oldhy = torch.cat(oldhy_arr, 0).unsqueeze(1)
                 else:
-                    oldhy = torch.cat(oldhy_arr, 0).view(len(oldhy_arr), batch_size, self.hidden_size)
+                    oldhy = torch.cat(oldhy_arr, 0).view(
+                        len(oldhy_arr), batch_size, self.hidden_size)
                     oldhy = oldhy.transpose(0, 1)
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_[0]), 1))
             else:
                 h_attn = self.attn_out(torch.cat((c_encoder, hidden_[0]), 1))
+            # coverage
             if self.coverage == 'asee_train':
                 lscv = torch.cat((past_attn.unsqueeze(2), attn.unsqueeze(2)), 2)
                 lscv = lscv.min(dim=2)[0]
@@ -231,9 +233,10 @@ class LSTMDecoder(torch.nn.Module):
                 if k + idx == 0:
                     past_attn = past_attn*0.0
                 past_attn = past_attn + attn_ee
-            
+            # output
             output_.append(h_attn)
             out_attn.append(attn)
+            # pointer
             if self.pointer_net:
                 pt_input = torch.cat((input_[k], hidden_[0], c_encoder), 1)
                 p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
