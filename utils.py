@@ -25,9 +25,9 @@ def fast_beam_search(
     src_seq_len = src_text.size(1)
     src_text_rep = src_text.unsqueeze(1).clone().repeat(1, beam_size, 1).view(-1, src_text.size(1)).cuda()
     if network == 'lstm':
-        encoder_hy, (h0_new, c0_new), h_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
+        encoder_hy, (h0_new, c0_new), h_attn_new, past_attn_new, past_dehy_new = model.forward_encoder(src_text_rep)
     else:
-        encoder_hy, hidden_decoder_new, h_attn_new, past_attn_new = model.forward_encoder(src_text_rep)
+        encoder_hy, hidden_decoder_new, h_attn_new, past_attn_new, past_dehy_new = model.forward_encoder(src_text_rep)
     
     beam_seq = Variable(torch.LongTensor(batch_size, beam_size, max_len+1).fill_(vocab2id['<pad>'])).cuda()
     beam_seq[:, :, 0] = vocab2id['<s>']
@@ -37,23 +37,13 @@ def fast_beam_search(
     
     for j in range(max_len):
         if network == 'lstm':
-            logits, (h0, c0), h_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
-                j,
-                last_wd.view(-1, 1), 
-                (h0_new, c0_new),
-                h_attn_new,
-                encoder_hy, 
-                past_attn_new
-            )
+            logits, (h0, c0), h_attn, past_attn, p_gen, attn_, past_dehy = model.forward_onestep_decoder(
+                j, last_wd.view(-1, 1), (h0_new, c0_new),
+                h_attn_new, encoder_hy, past_attn_new, past_dehy_new)
         else:
-            logits, hidden_decoder, h_attn, past_attn, p_gen, attn_ = model.forward_onestep_decoder(
-                j,
-                last_wd.view(-1, 1), 
-                hidden_decoder_new,
-                h_attn_new, 
-                encoder_hy,
-                past_attn_new
-            )
+            logits, hidden_decoder, h_attn, past_attn, p_gen, attn_, past_dehy = model.forward_onestep_decoder(
+                j, last_wd.view(-1, 1), hidden_decoder_new,
+                h_attn_new, encoder_hy, past_attn_new, past_dehy_new)
         if pointer_net:
             logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
         else:
