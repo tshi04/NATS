@@ -294,7 +294,7 @@ class GRUDecoder(torch.nn.Module):
             hidden_size=self.hidden_size,
             attn_method=self.attn_method,
             coverage=self.coverage).cuda()
-        
+        # intra-decoder
         if self.attn_decoder:
             self.decoder_attn_layer = AttentionDecoder(
                 hidden_size=self.hidden_size,
@@ -308,10 +308,14 @@ class GRUDecoder(torch.nn.Module):
                 self.hidden_size*2,
                 self.hidden_size,
                 bias=True).cuda()
-
+        # pointer generator network
         if self.pointer_net:
-            self.pt_out = torch.nn.Linear(
-                self.input_size+self.hidden_size*2, 1).cuda()
+            if self.attn_decoder:   
+                self.pt_out = torch.nn.Linear(
+                    self.input_size+self.hidden_size*3, 1).cuda()
+            else:
+                self.pt_out = torch.nn.Linear(
+                    self.input_size+self.hidden_size*2, 1).cuda()
             
     def forward(
         self, idx, input_, hidden_, h_attn, 
@@ -343,7 +347,7 @@ class GRUDecoder(torch.nn.Module):
                 past_dehy = past_dehy.transpose(0, 1) # seqL*batch*hidden
                 de_idx = past_dehy.size(0)
                 if k + idx == 0:
-                    past_dehy = hidden_.unsqueeze(0)
+                    past_dehy = hidden_.unsqueeze(0) # seqL*batch*hidden
                     past_dehy = past_dehy.transpose(0, 1) # batch*seqL*hidden
                 else:
                     past_dehy = past_dehy.contiguous().view(-1, self.hidden_size) # seqL*batch**hidden
@@ -371,19 +375,18 @@ class GRUDecoder(torch.nn.Module):
             output_.append(h_attn)
             out_attn.append(attn)
             if self.pointer_net:
-                pt_input = torch.cat((input_[k], hidden_, c_encoder), 1)
+                if self.attn_decoder:
+                    pt_input = torch.cat((input_[k], hidden_, c_encoder, c_decoder), 1)
+                else:
+                    pt_input = torch.cat((input_[k], hidden_, c_encoder), 1)
                 p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
             
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
         output_ = torch.cat(output_, 0).view(
-            len_seq, 
-            batch_size, 
-            hidden_size)
+            len_seq, batch_size, hidden_size)
         out_attn = torch.cat(out_attn, 0).view(
-            len_seq,
-            attn.size(0),
-            attn.size(1))
+            len_seq, attn.size(0), attn.size(1))
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
