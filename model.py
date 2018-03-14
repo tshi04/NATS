@@ -337,14 +337,16 @@ class GRUDecoder(torch.nn.Module):
                 else:
                     c_decoder, attn_de = self.decoder_attn_layer(
                         hidden_, past_dehy)
+                past_dehy = past_dehy.transpose(0, 1) # seqL*batch*hidden
+                de_idx = past_dehy.size(0)
                 if k + idx == 0:
-                    past_dehy = hidden_
-                    past_dehy = past_dehy.unsqueeze(1)
+                    past_dehy = hidden_.unsqueeze(0)
+                    past_dehy = past_dehy.transpose(0, 1) # batch*seqL*hidden
                 else:
-                    past_dehy = past_dehy.view(-1, self.hidden_size)
-                    past_dehy = torch.cat((past_dehy, hidden_), 0)
-                    past_dehy = past_dehy.view(k+idx+1, batch_size, self.hidden_size)
-                    past_dehy = past_dehy.transpose(0, 1)
+                    past_dehy = past_dehy.contiguous().view(-1, self.hidden_size) # seqL*batch**hidden
+                    past_dehy = torch.cat((past_dehy, hidden_), 0) # (seqL+1)*batch**hidden
+                    past_dehy = past_dehy.view(de_idx+1, batch_size, self.hidden_size) # (seqL+1)*batch*hidden
+                    past_dehy = past_dehy.transpose(0, 1) # batch*(seqL+1)*hidden
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_), 1))
             else:
                 h_attn = self.attn_out(torch.cat((c_encoder, hidden_), 1))
