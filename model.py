@@ -51,7 +51,7 @@ class AttentionEncoder(torch.nn.Module):
                 bias=False).cuda()
 
     def forward(self, dehy, enhy, past_attn):
-        
+        # attention score
         if self.method == 'luong_concat':
             attn_agg = self.attn_en_in(enhy) + self.attn_de_in(dehy.unsqueeze(1))
             if self.coverage[:4] == 'asee':
@@ -64,15 +64,15 @@ class AttentionEncoder(torch.nn.Module):
                 attn_ee = torch.bmm(enhy_new, dehy.unsqueeze(2)).squeeze(2)
             else:
                 attn_ee = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
-            
+        # coverage and attention weights
         if self.coverage == 'temporal':
             attn_ee = torch.exp(attn_ee)
-            attn = attn_ee / past_attn
+            attn = attn_ee/past_attn
             nm = torch.norm(attn, 1, 1).unsqueeze(1)
-            attn = attn / nm
+            attn = attn/nm
         else:
             attn = F.softmax(attn_ee, dim=1)
-            
+        # context vector
         attn2 = attn.unsqueeze(1)
         c_encoder = torch.bmm(attn2, enhy).squeeze(1)
         
@@ -111,22 +111,22 @@ class AttentionDecoder(torch.nn.Module):
                 self.hidden_size,
                 bias=False).cuda()
 
-    def forward(self, dehy, oldhy):
-        
+    def forward(self, dehy, past_hy):
+        # attention score
         if self.method == 'luong_concat':
-            attn_agg = self.attn_en_in(oldhy) + self.attn_de_in(dehy.unsqueeze(1))
+            attn_agg = self.attn_en_in(past_hy) + self.attn_de_in(dehy.unsqueeze(1))
             attn_agg = F.tanh(attn_agg)
             attn = self.attn_warp_in(attn_agg).squeeze(2)
         else:
             if self.method == 'luong_general':
-                oldhy_new = self.attn_in(oldhy)
-                attn = torch.bmm(oldhy_new, dehy.unsqueeze(2)).squeeze(2)
+                past_hy_new = self.attn_in(past_hy)
+                attn = torch.bmm(past_hy_new, dehy.unsqueeze(2)).squeeze(2)
             else:
-                attn = torch.bmm(oldhy, dehy.unsqueeze(2)).squeeze(2)
+                attn = torch.bmm(past_hy, dehy.unsqueeze(2)).squeeze(2)
         attn = F.softmax(attn, dim=1)
-
+        # context vector
         attn2 = attn.unsqueeze(1)
-        c_decoder = torch.bmm(attn2, oldhy).squeeze(1)
+        c_decoder = torch.bmm(attn2, past_hy).squeeze(1)
         
         return c_decoder, attn
 '''
@@ -162,7 +162,7 @@ class LSTMDecoder(torch.nn.Module):
             hidden_size=self.hidden_size,
             attn_method=self.attn_method, 
             coverage=self.coverage).cuda()
-        
+        # intra-decoder
         if self.attn_decoder:           
             self.decoder_attn_layer = AttentionDecoder(
                 hidden_size=self.hidden_size,
@@ -176,15 +176,19 @@ class LSTMDecoder(torch.nn.Module):
                 self.hidden_size*2,
                 self.hidden_size,
                 bias=True).cuda()
-
+        # pointer generator network
         if self.pointer_net:
-            self.pt_out = torch.nn.Linear(
-                self.input_size+self.hidden_size*2, 1).cuda()
+            if self.attn_decoder:   
+                self.pt_out = torch.nn.Linear(
+                    self.input_size+self.hidden_size*3, 1).cuda()
+            else:
+                self.pt_out = torch.nn.Linear(
+                    self.input_size+self.hidden_size*2, 1).cuda()
         
     def forward(
         self, idx, input_, hidden_, h_attn, 
         encoder_hy, past_attn, p_gen, past_dehy):
-            
+        
         if self.batch_first:
             input_ = input_.transpose(0,1)
         batch_size = input_.size(1)
@@ -211,7 +215,7 @@ class LSTMDecoder(torch.nn.Module):
                 past_dehy = past_dehy.transpose(0, 1) # seqL*batch*hidden
                 de_idx = past_dehy.size(0)
                 if k + idx == 0:
-                    past_dehy = hidden_[0].unsqueeze(0)
+                    past_dehy = hidden_[0].unsqueeze(0) # seqL*batch*hidden
                     past_dehy = past_dehy.transpose(0, 1) # batch*seqL*hidden
                 else:
                     past_dehy = past_dehy.contiguous().view(-1, self.hidden_size) # seqL*batch**hidden
@@ -240,7 +244,10 @@ class LSTMDecoder(torch.nn.Module):
             out_attn.append(attn)
             # pointer
             if self.pointer_net:
-                pt_input = torch.cat((input_[k], hidden_[0], c_encoder), 1)
+                if self.attn_decoder:
+                    pt_input = torch.cat((input_[k], hidden_[0], c_encoder, c_decoder), 1)
+                else:
+                    pt_input = torch.cat((input_[k], hidden_[0], c_encoder), 1)
                 p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
                     
         len_seq = input_.size(0)
