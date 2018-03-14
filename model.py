@@ -309,7 +309,7 @@ class GRUDecoder(torch.nn.Module):
             
     def forward(
         self, idx, input_, hidden_, h_attn, 
-        encoder_hy, past_attn, p_gen):
+        encoder_hy, past_attn, p_gen, past_dehy):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -317,7 +317,6 @@ class GRUDecoder(torch.nn.Module):
         
         output_ = []
         out_attn = []
-        oldhy_arr = []
         
         loss_cv = Variable(torch.zeros(1)).cuda()
         batch_size = input_.size(1)
@@ -335,12 +334,12 @@ class GRUDecoder(torch.nn.Module):
                 else:
                     c_decoder, attn_de = self.decoder_attn_layer(
                         hidden_, oldhy)
-                oldhy_arr.append(hidden_)
                 if k + idx == 0:
-                    oldhy = torch.cat(oldhy_arr, 0).unsqueeze(1)
+                    past_dehy = hidden_
+                    oldhy = past_dehy.unsqueeze(1)
                 else:
-                    oldhy = torch.cat(oldhy_arr, 0).view(
-                        len(oldhy_arr), batch_size, self.hidden_size)
+                    past_dehy = torch.cat((past_dehy, hidden_), 0)
+                    oldhy = past_dehy.view(k+idx+1, batch_size, self.hidden_size)
                     oldhy = oldhy.transpose(0, 1)
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_), 1))
             else:
@@ -380,7 +379,7 @@ class GRUDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
 
-        return output_, hidden_, h_attn, out_attn, past_attn, p_gen, loss_cv
+        return output_, hidden_, h_attn, out_attn, past_attn, p_gen, past_dehy, loss_cv
 '''
 sequence to sequence model
 ''' 
@@ -563,10 +562,10 @@ class Seq2Seq(torch.nn.Module):
             decoder_h0 = self.encoder2decoder(h_t)
             decoder_h0 = F.tanh(decoder_h0)
 
-            trg_h, _, _, attn_, _, p_gen, loss_cv = self.decoder(
+            trg_h, _, _, attn_, _, p_gen, _, loss_cv = self.decoder(
                 0, trg_emb,
                 decoder_h0, h_attn,
-                encoder_hy, past_attn, p_gen)
+                encoder_hy, past_attn, p_gen, past_dehy)
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(
             trg_h.size(0) * trg_h.size(1), trg_h.size(2))
