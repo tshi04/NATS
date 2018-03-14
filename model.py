@@ -253,13 +253,9 @@ class LSTMDecoder(torch.nn.Module):
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
         output_ = torch.cat(output_, 0).view(
-            len_seq, 
-            batch_size, 
-            hidden_size)
+            len_seq, batch_size, hidden_size)
         out_attn = torch.cat(out_attn, 0).view(
-            len_seq,
-            attn.size(0),
-            attn.size(1))
+            len_seq, attn.size(0), attn.size(1))
         
         if self.batch_first:
             output_ = output_.transpose(0,1)
@@ -581,7 +577,7 @@ class Seq2Seq(torch.nn.Module):
                 encoder_hy, past_attn, p_gen, past_dehy)
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(
-            trg_h.size(0) * trg_h.size(1), trg_h.size(2))
+            trg_h.size(0)*trg_h.size(1), trg_h.size(2))
         # consume a lot of memory.
         decoder_output = self.decoder2vocab(trg_h_reshape)
         decoder_output = decoder_output.view(
