@@ -183,7 +183,7 @@ class LSTMDecoder(torch.nn.Module):
         
     def forward(
         self, idx, input_, hidden_, h_attn, 
-        encoder_hy, past_attn, p_gen):
+        encoder_hy, past_attn, p_gen, past_dehy):
             
         if self.batch_first:
             input_ = input_.transpose(0,1)
@@ -191,7 +191,6 @@ class LSTMDecoder(torch.nn.Module):
         
         output_ = []
         out_attn = []
-        oldhy_arr = []
         
         loss_cv = Variable(torch.zeros(1)).cuda()
         batch_size = input_.size(1)
@@ -209,12 +208,12 @@ class LSTMDecoder(torch.nn.Module):
                 else:
                     c_decoder, attn_de = self.decoder_attn_layer(
                         hidden_[0], oldhy)
-                oldhy_arr.append(hidden_[0])
                 if k + idx == 0:
-                    oldhy = torch.cat(oldhy_arr, 0).unsqueeze(1)
+                    past_dehy = hidden_[0]
+                    oldhy = past_dehy.unsqueeze(1)
                 else:
-                    oldhy = torch.cat(oldhy_arr, 0).view(
-                        len(oldhy_arr), batch_size, self.hidden_size)
+                    past_dehy = torch.cat((past_dehy, hidden_[0]), 0)
+                    oldhy = past_dehy.view(k+idx+1, batch_size, self.hidden_size)
                     oldhy = oldhy.transpose(0, 1)
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_[0]), 1))
             else:
@@ -255,7 +254,7 @@ class LSTMDecoder(torch.nn.Module):
         if self.batch_first:
             output_ = output_.transpose(0,1)
    
-        return output_, hidden_, h_attn, out_attn, past_attn, p_gen, loss_cv
+        return output_, hidden_, h_attn, out_attn, past_attn, p_gen, past_dehy, loss_cv
 '''
 GRU decoder
 '''
@@ -526,6 +525,7 @@ class Seq2Seq(torch.nn.Module):
             batch_size, self.trg_hidden_dim)).cuda()
         p_gen = Variable(torch.zeros(
             batch_size, trg_seq_len)).cuda()
+        past_dehy = Variable(torch.zeros(1, 1)).cuda()
         # encoder
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
@@ -546,11 +546,11 @@ class Seq2Seq(torch.nn.Module):
             decoder_h0 = F.tanh(decoder_h0)
             decoder_c0 = c_t
             
-            trg_h, (_, _), _, attn_, _, p_gen, loss_cv = self.decoder(
+            trg_h, (_, _), _, attn_, _, p_gen, _, loss_cv = self.decoder(
                 0, trg_emb,
                 (decoder_h0, decoder_c0),
                 h_attn, encoder_hy,
-                past_attn, p_gen)
+                past_attn, p_gen, past_dehy)
         elif self.network_ == 'gru':
             encoder_hy, src_h_t = self.encoder(
                 src_emb, h0_encoder)
@@ -578,8 +578,9 @@ class Seq2Seq(torch.nn.Module):
         return decoder_output, attn_, p_gen, loss_cv
     
     def forward_encoder(self, input_src):
+        # parameters
         src_seq_len = input_src.size(1)
-        
+        # embedding
         if self.shared_emb:
             src_emb = self.embedding(input_src)
         else:
@@ -588,7 +589,7 @@ class Seq2Seq(torch.nn.Module):
         batch_size = input_src.size(1)
         if self.batch_first:
             batch_size = input_src.size(0)
-
+        # Variables
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
@@ -600,7 +601,7 @@ class Seq2Seq(torch.nn.Module):
                 batch_size, src_seq_len)).cuda()
         h_attn = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
-
+        # encoder
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
                 self.encoder.num_layers*self.src_num_directions,
@@ -659,22 +660,12 @@ class Seq2Seq(torch.nn.Module):
         
         if self.network_ == 'lstm':
             trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen, loss_cv = self.decoder(
-                idx,
-                trg_emb,
-                hidden_decoder,
-                h_attn,
-                encoder_hy,
-                past_attn,
-                p_gen)
+                idx, trg_emb, hidden_decoder, h_attn,
+                encoder_hy, past_attn, p_gen)
         if self.network_ == 'gru':
             trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen, loss_cv = self.decoder(
-                idx,
-                trg_emb,
-                hidden_decoder,
-                h_attn,
-                encoder_hy,
-                past_attn,
-                p_gen)
+                idx, trg_emb, hidden_decoder, h_attn,
+                encoder_hy, past_attn, p_gen)
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(
             trg_h.size(0) * trg_h.size(1), trg_h.size(2))
