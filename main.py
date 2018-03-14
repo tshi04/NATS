@@ -66,6 +66,7 @@ if opt.pointer_net:
 else:
     opt.copy_words = False
     opt.coverage = 'vanilla'
+    
 vocab2id, id2vocab = construct_vocab(
     file_=opt.data_dir+'/'+opt.file_vocab,
     max_size=opt.vocab_size,
@@ -163,11 +164,10 @@ if opt.task == 'train':
             trg_input_var = trg_input_var.cuda()
             trg_output_var = trg_output_var.cuda()
             logits, attn_, p_gen, loss_cv = model(src_var, trg_input_var)
+            logits = F.softmax(logits, dim=2)
             # use the pointer generator loss
             if opt.pointer_net:
-                logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)
-            else:
-                logits = F.softmax(logits, dim=2)
+                logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)                
 
             if batch_id%1 == 0:
                 word_prob = logits.topk(1, dim=2)[1].squeeze(2).data.cpu().numpy()
@@ -271,10 +271,9 @@ if opt.task == 'validate':
                     max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
                 )
                 logits, attn_, p_gen, loss_cv = model(src_var.cuda(), trg_input_var.cuda())
+                logits = F.softmax(logits, dim=2)
                 if opt.pointer_net:
-                    logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen, vocab2id)
-                else:
-                    logits = F.softmax(logits, dim=2)
+                    logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen, vocab2id)                   
 
                 logits = torch.log(logits)
                 loss = loss_criterion(

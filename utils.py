@@ -44,11 +44,10 @@ def fast_beam_search(
             logits, hidden_decoder, h_attn, past_attn, p_gen, attn_, past_dehy = model.forward_onestep_decoder(
                 j, last_wd.view(-1, 1), hidden_decoder_new,
                 h_attn_new, encoder_hy, past_attn_new, past_dehy_new)
+        logits = F.softmax(logits, dim=2)
         if pointer_net:
             logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
-        else:
-            logits = F.softmax(logits, dim=2)
-        
+           
         prob, wds = logits.data.topk(k=beam_size)
         prob = prob.view(batch_size, beam_size, prob.size(1), prob.size(2))
         wds = wds.view(batch_size, beam_size, wds.size(1), wds.size(2))
@@ -76,7 +75,7 @@ def fast_beam_search(
         cand_prob = beam_prb.unsqueeze(1).repeat(1, beam_size, 1).transpose(1,2)
         cand_prob += prob[:, :, 0]
         cand_prob = cand_prob.contiguous().view(batch_size, beam_size*beam_size)
-        
+        '''
         if network == 'lstm':
             h0_new = h0_new.view(batch_size, beam_size, h0_new.size(-1))
             c0_new = c0_new.view(batch_size, beam_size, c0_new.size(-1))
@@ -85,6 +84,15 @@ def fast_beam_search(
         h_attn_new = h_attn_new.view(batch_size, beam_size, h_attn_new.size(-1))
         attn_new = attn_new.view(batch_size, beam_size, attn_new.size(-1))
         past_attn_new = past_attn_new.view(batch_size, beam_size, past_attn_new.size(-1))
+        '''
+        if network == 'lstm':
+            h0_new = Variable(torch.zeros(batch_size, beam_size, h0.size(-1))).cuda()
+            c0_new = Variable(torch.zeros(batch_size, beam_size, c0.size(-1))).cuda()
+        else:
+            hidden_decoder_new = Variable(torch.zeros(batch_size, beam_size, hidden_decoder.size(-1))).cuda()
+        h_attn_new = Variable(torch.zeros(batch_size, beam_size, h_attn.size(-1))).cuda()
+        attn_new = Variable(torch.zeros(batch_size, beam_size, attn_.size(-1))).cuda()
+        past_attn_new = Variable(torch.zeros(batch_size, beam_size, past_attn.size(-1))).cuda()
         pdn_size1, pdn_size2 = past_dehy.size(-2), past_dehy.size(-1)
         past_dehy_new = Variable(torch.zeros(batch_size, beam_size, pdn_size1*pdn_size2)).cuda()
         if network == 'lstm':
@@ -129,4 +137,6 @@ def fast_beam_search(
         attn_new = attn_new.view(-1, attn_new.size(-1))
         past_attn_new = past_attn_new.view(-1, past_attn_new.size(-1))
         past_dehy_new = past_dehy_new.view(-1, pdn_size1, pdn_size2)
+        
+        torch.cuda.empty_cache()
     return beam_seq, beam_prb, beam_attn_

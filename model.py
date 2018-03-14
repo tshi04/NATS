@@ -537,12 +537,12 @@ class Seq2Seq(torch.nn.Module):
         p_gen = Variable(torch.zeros(
             batch_size, trg_seq_len)).cuda()
         past_dehy = Variable(torch.zeros(1, 1)).cuda()
-        # encoder
+        # network
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
                 self.encoder.num_layers*self.src_num_directions,
                 batch_size, self.src_hidden_dim)).cuda()
-
+            # encoder
             encoder_hy, (src_h_t, src_c_t) = self.encoder(
                 src_emb, (h0_encoder, c0_encoder))
 
@@ -556,13 +556,14 @@ class Seq2Seq(torch.nn.Module):
             decoder_h0 = self.encoder2decoder(h_t)
             decoder_h0 = F.tanh(decoder_h0)
             decoder_c0 = c_t
-            
+            # decoder
             trg_h, (_, _), _, attn_, _, p_gen, _, loss_cv = self.decoder(
                 0, trg_emb,
                 (decoder_h0, decoder_c0),
                 h_attn, encoder_hy,
                 past_attn, p_gen, past_dehy)
         elif self.network_ == 'gru':
+            # encoder
             encoder_hy, src_h_t = self.encoder(
                 src_emb, h0_encoder)
 
@@ -573,7 +574,7 @@ class Seq2Seq(torch.nn.Module):
                         
             decoder_h0 = self.encoder2decoder(h_t)
             decoder_h0 = F.tanh(decoder_h0)
-
+            # decoder
             trg_h, _, _, attn_, _, p_gen, _, loss_cv = self.decoder(
                 0, trg_emb,
                 decoder_h0, h_attn,
@@ -613,12 +614,12 @@ class Seq2Seq(torch.nn.Module):
         h_attn = Variable(torch.zeros(
             batch_size, self.trg_hidden_dim)).cuda()
         past_dehy = Variable(torch.zeros(1, 1)).cuda()
-        # encoder
+        # network
         if self.network_ == 'lstm':
             c0_encoder = Variable(torch.zeros(
                 self.encoder.num_layers*self.src_num_directions,
                 batch_size, self.src_hidden_dim)).cuda()
-
+            # encoder
             encoder_hy, (src_h_t, src_c_t) = self.encoder(
                 src_emb, 
                 (h0_encoder, c0_encoder))
@@ -637,6 +638,7 @@ class Seq2Seq(torch.nn.Module):
             return encoder_hy, (decoder_h0, decoder_c0), h_attn, past_attn, past_dehy
         
         elif self.network_ == 'gru':
+            # encoder
             encoder_hy, src_h_t = self.encoder(
                 src_emb, h0_encoder)
 
@@ -668,9 +670,9 @@ class Seq2Seq(torch.nn.Module):
         batch_size = input_trg.size(1)
         if self.batch_first:
             batch_size = input_trg.size(0)
-
+        # pointer weight
         p_gen = Variable(torch.zeros(batch_size, 1)).cuda()
-        
+        # decoder
         if self.network_ == 'lstm':
             trg_h, hidden_decoder, h_attn, attn_, past_attn, p_gen, past_dehy, loss_cv = self.decoder(
                 idx, trg_emb, hidden_decoder, h_attn,
@@ -689,15 +691,14 @@ class Seq2Seq(torch.nn.Module):
         return decoder_output, hidden_decoder, h_attn, past_attn, p_gen, attn_, past_dehy
 
     def cal_dist(self, input_src, logits_, attn_, p_gen, src_vocab2id):
-    
+        # parameters
         src_seq_len = input_src.size(1)
         trg_seq_len = logits_.size(1)
         batch_size = input_src.size(0)
         vocab_size = len(src_vocab2id)
                 
-        logits_ = F.softmax(logits_, dim=2)
         attn_ = attn_.transpose(0, 1)
-
+        # calculate index matrix
         pt_idx = Variable(torch.FloatTensor(torch.zeros(1, 1, 1))).cuda()
         pt_idx = pt_idx.repeat(batch_size, src_seq_len, vocab_size)
         pt_idx.scatter_(2, input_src.unsqueeze(2), 1.0)
