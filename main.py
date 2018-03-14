@@ -39,7 +39,7 @@ parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 
 parser.add_argument('--attn_method', default='luong_general', help='luong_dot | luong_concat | luong_general')
 parser.add_argument('--coverage', default='temporal', help='vanilla | temporal | asee')
-parser.add_argument('--network_', default='gru', help='gru | lstm')
+parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--attn_decoder', type=bool, default=True, help='attention decoder?')
 
@@ -55,7 +55,7 @@ parser.add_argument('--file_val', default='val.txt', help='val data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_0_5000', help='file for model.')
 
 opt = parser.parse_args()
 

@@ -65,6 +65,7 @@ def fast_beam_search(
             h_attn_new = h_attn
             attn_new = attn_
             past_attn_new = past_attn
+            past_dehy_new = past_dehy
             beam_attn_[j] = attn_new.view(batch_size, beam_size, attn_new.size(-1))
             continue
 
@@ -84,7 +85,8 @@ def fast_beam_search(
         h_attn_new = h_attn_new.view(batch_size, beam_size, h_attn_new.size(-1))
         attn_new = attn_new.view(batch_size, beam_size, attn_new.size(-1))
         past_attn_new = past_attn_new.view(batch_size, beam_size, past_attn_new.size(-1))
-        
+        pdn_size1, pdn_size2 = past_dehy.size(-2), past_dehy.size(-1)
+        past_dehy_new = Variable(torch.zeros(batch_size, beam_size, pdn_size1*pdn_size2)).cuda()
         if network == 'lstm':
             h0 = h0.view(batch_size, beam_size, h0.size(-1))
             h0 = tensor_transformer(h0, batch_size, beam_size)
@@ -99,7 +101,8 @@ def fast_beam_search(
         attn_ = tensor_transformer(attn_, batch_size, beam_size)
         past_attn = past_attn.view(batch_size, beam_size, past_attn.size(-1))
         past_attn = tensor_transformer(past_attn, batch_size, beam_size)
-        
+        past_dehy = past_dehy.contiguous().view(batch_size, beam_size, past_dehy.size(-2)*past_dehy.size(-1))
+        past_dehy = tensor_transformer(past_dehy, batch_size, beam_size)
         tmp_prb, tmp_idx = cand_prob.topk(k=beam_size, dim=1)
         for x in range(batch_size):
             for b in range(beam_size):
@@ -125,5 +128,5 @@ def fast_beam_search(
         h_attn_new = h_attn_new.view(-1, h_attn_new.size(-1))
         attn_new = attn_new.view(-1, attn_new.size(-1))
         past_attn_new = past_attn_new.view(-1, past_attn_new.size(-1))
-        
+        past_dehy_new = past_dehy_new.view(-1, pdn_size1, pdn_size2)
     return beam_seq, beam_prb, beam_attn_
