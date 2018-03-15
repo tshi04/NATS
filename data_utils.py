@@ -227,18 +227,10 @@ def process_minibatch_explicit(batch_id, path_, fkey_, batch_size, vocab2id, max
         itm[:-1] + [vocab2id['<pad>']]*(1+trg_max_lens-len(itm))
         for itm in trg_arr
     ]
-    trg_output_arr = [
-        itm[1:] + [vocab2id['<pad>']]*(1+trg_max_lens-len(itm))
-        for itm in trg_arr
-    ]
     # extend oov
     src_arr_ex = [
         itm + [vocab2id['<pad>']]*(src_max_lens-len(itm))
         for itm in src_arr_ex
-    ]
-    trg_input_arr_ex = [
-        itm[:-1] + [vocab2id['<pad>']]*(1+trg_max_lens-len(itm))
-        for itm in trg_arr_ex
     ]
     trg_output_arr_ex = [
         itm[1:] + [vocab2id['<pad>']]*(1+trg_max_lens-len(itm))
@@ -247,14 +239,12 @@ def process_minibatch_explicit(batch_id, path_, fkey_, batch_size, vocab2id, max
     
     src_var = Variable(torch.LongTensor(src_arr))
     trg_input_var = Variable(torch.LongTensor(trg_input_arr))
-    trg_output_var = Variable(torch.LongTensor(trg_output_arr))
     # extend oov
     src_var_ex = Variable(torch.LongTensor(src_arr_ex))
-    trg_input_var_ex = Variable(torch.LongTensor(trg_input_arr_ex))
     trg_output_var_ex = Variable(torch.LongTensor(trg_output_arr_ex))
     
-    return ext_id2oov, src_var, trg_input_var, trg_output_var, \
-           src_var_ex, trg_input_var_ex, trg_output_var_ex
+    return ext_id2oov, src_var, trg_input_var, \
+           src_var_ex, trg_output_var_ex
 '''
 Process the minibatch test
 '''

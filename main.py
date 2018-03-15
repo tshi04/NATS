@@ -153,14 +153,15 @@ if opt.task == 'train':
             else:
                 cclb += 1
             if opt.oov_explicit:
-                ext_id2oov, src_var, trg_input_var, trg_output_var, \
-                src_var_ex, trg_input_var_ex, trg_output_var_ex = process_minibatch_explicit(
+                ext_id2oov, src_var, trg_input_var, \
+                src_var_ex, trg_output_var_ex = process_minibatch_explicit(
                     batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
                     batch_size=opt.batch_size, 
                     vocab2id=vocab2id, 
                     max_lens=[opt.src_seq_lens, opt.trg_seq_lens])
+                src_var = src_var.cuda()
+                trg_input_var = trg_input_var.cuda()
                 src_var_ex = src_var_ex.cuda()
-                trg_input_var_ex = trg_input_var_ex.cuda()
                 trg_output_var_ex = trg_output_var_ex.cuda()
                 
                 weight_mask = torch.ones(len(vocab2id)+len(ext_id2oov)).cuda()
@@ -176,9 +177,9 @@ if opt.task == 'train':
                 weight_mask = torch.ones(len(vocab2id)).cuda()
                 weight_mask[vocab2id['<pad>']] = 0
                 loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
-            src_var = src_var.cuda()
-            trg_input_var = trg_input_var.cuda()
-            trg_output_var = trg_output_var.cuda()
+                src_var = src_var.cuda()
+                trg_input_var = trg_input_var.cuda()
+                trg_output_var = trg_output_var.cuda()
             
             logits, attn_, p_gen, loss_cv = model(src_var, trg_input_var)
             logits = F.softmax(logits, dim=2)
