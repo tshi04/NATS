@@ -403,7 +403,7 @@ if opt.task == 'beam':
                 src_text_ex=src_var_ex,
                 vocab2id=vocab2id,
                 ext_id2oov=ext_id2oov,
-                beam_size=opt.beam_size, 
+                beam_size=opt.beam_size,
                 max_len=opt.trg_seq_lens,
                 network=opt.network_,
                 pointer_net=opt.pointer_net,
