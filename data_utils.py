@@ -1,3 +1,7 @@
+'''
+@author Tian Shi
+Please contact tshi@vt.edu
+'''
 import os
 import re
 import glob

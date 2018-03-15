@@ -1,5 +1,4 @@
 '''
-Copyright 2018 @ Tian Shi
 @author Tian Shi
 Please contact tshi@vt.edu
 '''
