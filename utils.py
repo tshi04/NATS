@@ -19,15 +19,20 @@ def tensor_transformer(seq0, batch_size, beam_size):
 def fast_beam_search(
     model, 
     src_text,
+    src_text_ex,
     vocab2id,
+    ext_id2oov,
     beam_size=4, 
     max_len=20,
-    network='gru',
-    pointer_net=True
+    network='lstm',
+    pointer_net=True,
+    oov_explicit=True
 ):
     batch_size = src_text.size(0)
     src_seq_len = src_text.size(1)
     src_text_rep = src_text.unsqueeze(1).clone().repeat(1, beam_size, 1).view(-1, src_text.size(1)).cuda()
+    if oov_explicit:
+        src_text_rep_ex = src_text_ex.unsqueeze(1).clone().repeat(1, beam_size, 1).view(-1, src_text_ex.size(1)).cuda()
     if network == 'lstm':
         encoder_hy, (h0_new, c0_new), h_attn_new, past_attn_new, past_dehy_new = model.forward_encoder(src_text_rep)
     else:
@@ -50,7 +55,11 @@ def fast_beam_search(
                 h_attn_new, encoder_hy, past_attn_new, past_dehy_new)
         logits = F.softmax(logits, dim=2)
         if pointer_net:
-            logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
+            if oov_explicit:
+                logits2 = model.cal_dist_explicit(src_text_rep_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
+                logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
+            else:
+                logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
            
         prob, wds = logits.data.topk(k=beam_size)
         prob = prob.view(batch_size, beam_size, prob.size(1), prob.size(2))
@@ -71,7 +80,7 @@ def fast_beam_search(
             past_dehy_new = past_dehy
             beam_attn_[j] = attn_new.view(batch_size, beam_size, attn_new.size(-1))
             continue
-
+            
         cand_seq = tensor_transformer(beam_seq, batch_size, beam_size)
         cand_seq[:, :, j+1] = wds.squeeze(2).view(batch_size, -1)
         cand_last_wd = wds.squeeze(2).view(batch_size, -1)
@@ -79,16 +88,6 @@ def fast_beam_search(
         cand_prob = beam_prb.unsqueeze(1).repeat(1, beam_size, 1).transpose(1,2)
         cand_prob += prob[:, :, 0]
         cand_prob = cand_prob.contiguous().view(batch_size, beam_size*beam_size)
-        '''
-        if network == 'lstm':
-            h0_new = h0_new.view(batch_size, beam_size, h0_new.size(-1))
-            c0_new = c0_new.view(batch_size, beam_size, c0_new.size(-1))
-        else:
-            hidden_decoder_new = hidden_decoder_new.view(batch_size, beam_size, hidden_decoder_new.size(-1))
-        h_attn_new = h_attn_new.view(batch_size, beam_size, h_attn_new.size(-1))
-        attn_new = attn_new.view(batch_size, beam_size, attn_new.size(-1))
-        past_attn_new = past_attn_new.view(batch_size, beam_size, past_attn_new.size(-1))
-        '''
         if network == 'lstm':
             h0_new = Variable(torch.zeros(batch_size, beam_size, h0.size(-1))).cuda()
             c0_new = Variable(torch.zeros(batch_size, beam_size, c0.size(-1))).cuda()

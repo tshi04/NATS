@@ -288,4 +288,68 @@ def process_minibatch_test(batch_id, path_, batch_size, vocab2id, src_lens):
     src_arr = [itm + ['<pad>']*(src_lens-len(itm)) for itm in src_arr]
 
     return src_var, src_arr, src_msk, trg_arr
+'''
+Process the minibatch test. 
+OOV explicit.
+'''
+def process_minibatch_explicit_test(batch_id, path_, batch_size, vocab2id, src_lens):
+    
+    file_ = os.path.join(path_, 'batch_test_'+str(batch_size), str(batch_id))
+    # build extended vocabulary
+    fp = open(file_, 'r')
+    ext_vocab = {}
+    ext_id2oov = {}
+    for line in fp:
+        arr = re.split('<sec>', line[:-1])
+        dart = re.split('\s', arr[1])
+        dart = filter(None, dart)
+        for wd in dart:
+            if wd not in vocab2id:
+                ext_vocab[wd] = {}
+    cnt = len(vocab2id)
+    for wd in ext_vocab:
+        ext_vocab[wd] = cnt
+        ext_id2oov[cnt] = wd
+        cnt += 1
+    fp.close()
+    
+    fp = open(file_, 'r')
+    src_arr = []
+    src_idx = []
+    src_idx_ex = []
+    src_wt = []
+    trg_arr = []
+    for line in fp:
+        arr = re.split('<sec>', line[:-1])
+        dabs = re.split('\s', arr[0])
+        dabs = filter(None, dabs)
+        dabs = ' '.join(dabs)
+        trg_arr.append(dabs)
+        
+        dart = re.split('\s', arr[1])
+        dart = filter(None, dart)
+        src_arr.append(dart)
+        dart2id = [vocab2id[wd] if wd in vocab2id else vocab2id['<unk>'] for wd in dart]
+        src_idx.append(dart2id)
+        dart2id = [vocab2id[wd] if wd in vocab2id else ext_vocab[wd] for wd in dart]
+        src_idx_ex.append(dart2id)
+        dart2wt = [0.0 if wd in vocab2id else 1.0 for wd in dart]
+        src_wt.append(dart2wt)
+    fp.close()
 
+    src_idx = [itm[:src_lens] for itm in src_idx]
+    src_idx = [itm + [vocab2id['<pad>']]*(src_lens-len(itm)) for itm in src_idx]
+    src_var = Variable(torch.LongTensor(src_idx))
+    
+    src_idx_ex = [itm[:src_lens] for itm in src_idx_ex]
+    src_idx_ex = [itm + [vocab2id['<pad>']]*(src_lens-len(itm)) for itm in src_idx_ex]
+    src_var_ex = Variable(torch.LongTensor(src_idx_ex))
+    
+    src_wt = [itm[:src_lens] for itm in src_wt]
+    src_wt = [itm + [0.0]*(src_lens-len(itm)) for itm in src_wt]
+    src_msk = Variable(torch.FloatTensor(src_wt))
+    
+    src_arr = [itm[:src_lens] for itm in src_arr]
+    src_arr = [itm + ['<pad>']*(src_lens-len(itm)) for itm in src_arr]
+    
+    return ext_id2oov, src_var, src_var_ex, src_arr, src_msk, trg_arr

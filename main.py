@@ -58,6 +58,7 @@ parser.add_argument('--debug', type=bool, default=False, help='if true will clea
 parser.add_argument('--file_test', default='test.txt', help='test data')
 parser.add_argument('--file_val', default='val.txt', help='val data')
 parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
+
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
 parser.add_argument('--model_file', default='seq2seq_0_5000', help='file for model.')
@@ -259,10 +260,6 @@ if opt.task == 'train':
 validate
 '''
 if opt.task == 'validate':   
-    weight_mask = torch.ones(len(vocab2id)).cuda()
-    weight_mask[vocab2id['<pad>']] = 0
-    loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
-    
     best_arr = []
     val_file = os.path.join(opt.data_dir, opt.model_dir, 'model_validate.txt')
     if os.path.exists(val_file):
@@ -298,22 +295,54 @@ if opt.task == 'validate':
             if opt.val_num_batch > val_batch:
                 opt.val_num_batch = val_batch
             for batch_id in range(opt.val_num_batch):
-                src_var, trg_input_var, trg_output_var = process_minibatch(
-                    batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
-                    batch_size=opt.batch_size,
-                    src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
-                    max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
-                )
+                
+                if opt.oov_explicit:
+                    ext_id2oov, src_var, trg_input_var, \
+                    src_var_ex, trg_output_var_ex = process_minibatch_explicit(
+                        batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
+                        batch_size=opt.batch_size, 
+                        vocab2id=vocab2id, 
+                        max_lens=[opt.src_seq_lens, opt.trg_seq_lens])
+                    src_var = src_var.cuda()
+                    trg_input_var = trg_input_var.cuda()
+                    src_var_ex = src_var_ex.cuda()
+                    trg_output_var_ex = trg_output_var_ex.cuda()
+                    
+                    weight_mask = torch.ones(len(vocab2id)+len(ext_id2oov)).cuda()
+                    weight_mask[vocab2id['<pad>']] = 0
+                    loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
+                else:
+                    src_var, trg_input_var, trg_output_var = process_minibatch(
+                        batch_id=batch_id, path_=opt.data_dir, fkey_='validate', 
+                        batch_size=opt.batch_size, 
+                        src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
+                        max_lens=[opt.src_seq_lens, opt.trg_seq_lens])
+                    weight_mask = torch.ones(len(vocab2id)).cuda()
+                    weight_mask[vocab2id['<pad>']] = 0
+                    loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
+                    src_var = src_var.cuda()
+                    trg_input_var = trg_input_var.cuda()
+                    trg_output_var = trg_output_var.cuda()
+                
                 logits, attn_, p_gen, loss_cv = model(src_var.cuda(), trg_input_var.cuda())
                 logits = F.softmax(logits, dim=2)
+                # use the pointer generator loss
                 if opt.pointer_net:
-                    logits = model.cal_dist(src_var.cuda(), logits, attn_, p_gen, vocab2id)                   
-
+                    if opt.oov_explicit:
+                        logits = model.cal_dist_explicit(src_var_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
+                        logits = logits + 1e-20
+                    else:
+                        logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)
+                    
                 logits = torch.log(logits)
-                loss = loss_criterion(
-                    logits.contiguous().view(-1, len(vocab2id)),
-                    trg_output_var.view(-1).cuda()
-                )
+                if opt.oov_explicit:
+                    loss = loss_criterion(
+                        logits.contiguous().view(-1, len(vocab2id)+len(ext_id2oov)),
+                        trg_output_var_ex.view(-1))
+                else:
+                    loss = loss_criterion(
+                        logits.contiguous().view(-1, len(vocab2id)),
+                        trg_output_var.view(-1))
                 
                 loss = loss + loss_cv
                 losses.append(loss.data.cpu().numpy()[0])
@@ -356,56 +385,112 @@ if opt.task == 'beam':
         os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
     
     start_time = time.time()
-    fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
-    for batch_id in range(test_batch):
-        src_var, src_arr, src_msk, trg_arr = process_minibatch_test(
-            batch_id=batch_id, path_=opt.data_dir, 
-            batch_size=opt.batch_size, vocab2id=vocab2id, 
-            src_lens=opt.src_seq_lens
-        )
-        src_msk = src_msk.cuda()
-        src_var = src_var.cuda()
-        beam_seq, beam_prb, beam_attn_ = fast_beam_search(
-            model=model,
-            src_text=src_var, 
-            vocab2id=vocab2id, 
-            beam_size=opt.beam_size, 
-            max_len=opt.trg_seq_lens,
-            network=opt.network_,
-            pointer_net=opt.pointer_net
-        )
-        src_msk = src_msk.repeat(1, opt.beam_size).view(
-            src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
-        beam_attn_ = beam_attn_*src_msk
-        if opt.copy_words:
-            beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
-            beam_copy = beam_copy[:, :, 0].transpose(0, 1)
-            wdidx_copy = beam_copy.data.cpu().numpy()
-            for b in range(len(trg_arr)):
-                arr = []
-                gen_text = beam_seq.data.cpu().numpy()[b,0]
-                gen_text = [id2vocab[wd] for wd in gen_text]
-                gen_text = gen_text[1:]
-                for j in range(len(gen_text)):
-                    if gen_text[j] == '<unk>':
-                        gen_text[j] = src_arr[b][wdidx_copy[b, j]]
-                arr.append(' '.join(gen_text))
-                arr.append(trg_arr[b])
-                fout.write('<sec>'.join(arr)+'\n')
-        else:
-            for b in range(len(trg_arr)):
-                arr = []
-                gen_text = beam_seq.data.cpu().numpy()[b,0]
-                gen_text = [id2vocab[wd] for wd in gen_text]
-                gen_text = gen_text[1:]
-                arr.append(' '.join(gen_text))
-                arr.append(trg_arr[b])
-                fout.write('<sec>'.join(arr)+'\n')
-
-        end_time = time.time()
-        print(batch_id, end_time-start_time)
+    if opt.oov_explicit:
+        fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
+        for batch_id in range(test_batch):
+            ext_id2oov, src_var, src_var_ex, src_arr, src_msk, trg_arr \
+            = process_minibatch_explicit_test(
+                batch_id=batch_id, path_=opt.data_dir, 
+                batch_size=opt.batch_size, vocab2id=vocab2id, 
+                src_lens=opt.src_seq_lens
+            )
+            src_msk = src_msk.cuda()
+            src_var = src_var.cuda()
+            src_var_ex = src_var_ex.cuda()
+            beam_seq, beam_prb, beam_attn_ = fast_beam_search(
+                model=model,
+                src_text=src_var,
+                src_text_ex=src_var_ex,
+                vocab2id=vocab2id,
+                ext_id2oov=ext_id2oov,
+                beam_size=opt.beam_size, 
+                max_len=opt.trg_seq_lens,
+                network=opt.network_,
+                pointer_net=opt.pointer_net,
+                oov_explicit=opt.oov_explicit)
+            src_msk = src_msk.repeat(1, opt.beam_size).view(
+                src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
+            beam_attn_ = beam_attn_*src_msk
+            if opt.copy_words:
+                beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
+                beam_copy = beam_copy[:, :, 0].transpose(0, 1)
+                wdidx_copy = beam_copy.data.cpu().numpy()
+                for b in range(len(trg_arr)):
+                    arr = []
+                    gen_text = beam_seq.data.cpu().numpy()[b,0]
+                    gen_text = [id2vocab[wd] for wd in gen_text]
+                    gen_text = gen_text[1:]
+                    for j in range(len(gen_text)):
+                        if gen_text[j] == '<unk>':
+                            gen_text[j] = src_arr[b][wdidx_copy[b, j]]
+                    arr.append(' '.join(gen_text))
+                    arr.append(trg_arr[b])
+                    fout.write('<sec>'.join(arr)+'\n')
+            else:
+                for b in range(len(trg_arr)):
+                    arr = []
+                    gen_text = beam_seq.data.cpu().numpy()[b,0]
+                    gen_text = [id2vocab[wd] for wd in gen_text]
+                    gen_text = gen_text[1:]
+                    arr.append(' '.join(gen_text))
+                    arr.append(trg_arr[b])
+                    fout.write('<sec>'.join(arr)+'\n')
     
-    fout.close()
+            end_time = time.time()
+            print(batch_id, end_time-start_time)
+        fout.close()
+    else:
+        fout = open(os.path.join(opt.data_dir, 'summaries.txt'), 'w')
+        for batch_id in range(test_batch):
+            src_var, src_arr, src_msk, trg_arr = process_minibatch_test(
+                batch_id=batch_id, path_=opt.data_dir, 
+                batch_size=opt.batch_size, vocab2id=src_vocab2id, 
+                src_lens=opt.src_seq_lens
+            )
+            src_msk = src_msk.cuda()
+            src_var = src_var.cuda()
+            beam_seq, beam_prb, beam_attn_ = fast_beam_search(
+                model=model,
+                src_text=src_var,
+                src_text_ex=src_var, 
+                vocab2id=src_vocab2id,
+                ext_id2oov=src_vocab2id,
+                beam_size=opt.beam_size, 
+                max_len=opt.trg_seq_lens,
+                network=opt.network_,
+                pointer_net=opt.pointer_net,
+                oov_explicit=opt.oov_explicit)
+            src_msk = src_msk.repeat(1, opt.beam_size).view(
+                src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
+            beam_attn_ = beam_attn_*src_msk
+            if opt.copy_words:
+                beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
+                beam_copy = beam_copy[:, :, 0].transpose(0, 1)
+                wdidx_copy = beam_copy.data.cpu().numpy()
+                for b in range(len(trg_arr)):
+                    arr = []
+                    gen_text = beam_seq.data.cpu().numpy()[b,0]
+                    gen_text = [src_id2vocab[wd] for wd in gen_text]
+                    gen_text = gen_text[1:]
+                    for j in range(len(gen_text)):
+                        if gen_text[j] == '<unk>':
+                            gen_text[j] = src_arr[b][wdidx_copy[b, j]]
+                    arr.append(' '.join(gen_text))
+                    arr.append(trg_arr[b])
+                    fout.write('<sec>'.join(arr)+'\n')
+            else:
+                for b in range(len(trg_arr)):
+                    arr = []
+                    gen_text = beam_seq.data.cpu().numpy()[b,0]
+                    gen_text = [src_id2vocab[wd] for wd in gen_text]
+                    gen_text = gen_text[1:]
+                    arr.append(' '.join(gen_text))
+                    arr.append(trg_arr[b])
+                    fout.write('<sec>'.join(arr)+'\n')
+    
+            end_time = time.time()
+            print(batch_id, end_time-start_time)
+        fout.close()
 '''
 rouge
 '''
