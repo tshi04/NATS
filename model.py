@@ -705,3 +705,22 @@ class Seq2Seq(torch.nn.Module):
         
         return p_gen.unsqueeze(2)*logits_ + (1.0-p_gen.unsqueeze(2))*torch.bmm(attn_, pt_idx)
     
+    def cal_dist_explicit(self, input_src, logits_, attn_, p_gen, vocab2id, ext_id2oov):
+        # parameters
+        src_seq_len = input_src.size(1)
+        trg_seq_len = logits_.size(1)
+        batch_size = input_src.size(0)
+        vocab_size = len(vocab2id) + len(ext_id2oov)
+        
+        # extend current structure
+        logits_ex = Variable(torch.zeros(1, 1, 1)).cuda()
+        logits_ex = logits_ex.repeat(batch_size, trg_seq_len, len(ext_id2oov))
+        logits_ = torch.cat((logits_, logits_ex), -1)
+        # pointer
+        attn_ = attn_.transpose(0, 1)
+        # calculate index matrix
+        pt_idx = Variable(torch.FloatTensor(torch.zeros(1, 1, 1))).cuda()
+        pt_idx = pt_idx.repeat(batch_size, src_seq_len, vocab_size)
+        pt_idx.scatter_(2, input_src.unsqueeze(2), 1.0)
+        
+        return p_gen.unsqueeze(2)*logits_ + (1.0-p_gen.unsqueeze(2))*torch.bmm(attn_, pt_idx)

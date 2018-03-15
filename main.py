@@ -111,10 +111,6 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
 train
 '''
 if opt.task == 'train':
-    weight_mask = torch.ones(len(vocab2id)).cuda()
-    weight_mask[vocab2id['<pad>']] = 0
-    loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
-
     optimizer = torch.optim.Adam(model.parameters(), lr=opt.learning_rate)
     # read the last check point and continue training
     uf_model = [0, -1]
@@ -157,36 +153,55 @@ if opt.task == 'train':
             else:
                 cclb += 1
             if opt.oov_explicit:
-                src_var, trg_input_var, trg_output_var = process_minibatch_explicit(
+                ext_id2oov, src_var, trg_input_var, trg_output_var, \
+                src_var_ex, trg_input_var_ex, trg_output_var_ex = process_minibatch_explicit(
                     batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
                     batch_size=opt.batch_size, 
                     vocab2id=vocab2id, 
                     max_lens=[opt.src_seq_lens, opt.trg_seq_lens])
+                src_var_ex = src_var_ex.cuda()
+                trg_input_var_ex = trg_input_var_ex.cuda()
+                trg_output_var_ex = trg_output_var_ex.cuda()
+                
+                weight_mask = torch.ones(len(vocab2id)+len(ext_id2oov)).cuda()
+                weight_mask[vocab2id['<pad>']] = 0
+                loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
             else:
                 src_var, trg_input_var, trg_output_var = process_minibatch(
                     batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
                     batch_size=opt.batch_size, 
                     src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
                     max_lens=[opt.src_seq_lens, opt.trg_seq_lens])
+                
+                weight_mask = torch.ones(len(vocab2id)).cuda()
+                weight_mask[vocab2id['<pad>']] = 0
+                loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
             src_var = src_var.cuda()
             trg_input_var = trg_input_var.cuda()
             trg_output_var = trg_output_var.cuda()
+            
             logits, attn_, p_gen, loss_cv = model(src_var, trg_input_var)
             logits = F.softmax(logits, dim=2)
             # use the pointer generator loss
             if opt.pointer_net:
                 if opt.oov_explicit:
-                    pass
+                    logits = model.cal_dist_explicit(src_var_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
+                    logits = logits + 1e-20
                 else:
-                    logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)                
+                    logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)
 
             if batch_id%1 == 0:
                 word_prob = logits.topk(1, dim=2)[1].squeeze(2).data.cpu().numpy()
                 
             logits = torch.log(logits)
-            loss = loss_criterion(
-                logits.contiguous().view(-1, len(vocab2id)),
-                trg_output_var.view(-1))
+            if opt.oov_explicit:
+                loss = loss_criterion(
+                    logits.contiguous().view(-1, len(vocab2id)+len(ext_id2oov)),
+                    trg_output_var_ex.view(-1))
+            else:
+                loss = loss_criterion(
+                    logits.contiguous().view(-1, len(vocab2id)),
+                    trg_output_var.view(-1))
             
             if opt.coverage == 'asee_train':
                 loss = loss + loss_cv
@@ -210,7 +225,10 @@ if opt.task == 'train':
                 fmodel.close()
             if batch_id%1 == 0:
                 end_time = time.time()
-                sen_pred = [id2vocab[x] for x in word_prob[0]]
+                if opt.oov_explicit:
+                    sen_pred = [id2vocab[x] if x in id2vocab else ext_id2oov[x] for x in word_prob[0]]
+                else:
+                    sen_pred = [id2vocab[x] for x in word_prob[0]]
                 print 'epoch={0}, batch={1}, loss={2}, loss_cv={3}, time_escape={4}s={5}h'.format(
                     epoch, batch_id, 
                     loss.data.cpu().numpy()[0], 
