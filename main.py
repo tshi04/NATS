@@ -42,6 +42,7 @@ parser.add_argument('--coverage', default='temporal', help='vanilla | temporal |
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--attn_decoder', type=bool, default=True, help='attention decoder?')
+parser.add_argument('--oov_explicit', type=bool, default=True, help='explicit OOV?')
 
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
@@ -66,6 +67,8 @@ if opt.pointer_net:
 else:
     opt.copy_words = False
     opt.coverage = 'vanilla'
+if opt.oov_explicit:
+    opt.shared_embedding = True
     
 vocab2id, id2vocab = construct_vocab(
     file_=opt.data_dir+'/'+opt.file_vocab,
@@ -108,7 +111,6 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
 train
 '''
 if opt.task == 'train':
-    
     weight_mask = torch.ones(len(vocab2id)).cuda()
     weight_mask[vocab2id['<pad>']] = 0
     loss_criterion = torch.nn.NLLLoss(weight=weight_mask).cuda()
@@ -154,12 +156,18 @@ if opt.task == 'train':
                 continue
             else:
                 cclb += 1
-            src_var, trg_input_var, trg_output_var = process_minibatch(
-                batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
-                batch_size=opt.batch_size, 
-                src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
-                max_lens=[opt.src_seq_lens, opt.trg_seq_lens]
-            )
+            if opt.oov_explicit:
+                src_var, trg_input_var, trg_output_var = process_minibatch_explicit(
+                    batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
+                    batch_size=opt.batch_size, 
+                    vocab2id=vocab2id, 
+                    max_lens=[opt.src_seq_lens, opt.trg_seq_lens])
+            else:
+                src_var, trg_input_var, trg_output_var = process_minibatch(
+                    batch_id=batch_id, path_=opt.data_dir, fkey_='train', 
+                    batch_size=opt.batch_size, 
+                    src_vocab2id=src_vocab2id, vocab2id=vocab2id, 
+                    max_lens=[opt.src_seq_lens, opt.trg_seq_lens])
             src_var = src_var.cuda()
             trg_input_var = trg_input_var.cuda()
             trg_output_var = trg_output_var.cuda()
@@ -167,7 +175,10 @@ if opt.task == 'train':
             logits = F.softmax(logits, dim=2)
             # use the pointer generator loss
             if opt.pointer_net:
-                logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)                
+                if opt.oov_explicit:
+                    pass
+                else:
+                    logits = model.cal_dist(src_var, logits, attn_, p_gen, src_vocab2id)                
 
             if batch_id%1 == 0:
                 word_prob = logits.topk(1, dim=2)[1].squeeze(2).data.cpu().numpy()

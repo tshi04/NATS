@@ -135,6 +135,86 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id
     
     return src_var, trg_input_var, trg_output_var
 '''
+Process the minibatch.
+'''
+def process_minibatch_explicit(batch_id, path_, fkey_, batch_size, vocab2id, max_lens=[400, 100]):
+    
+    file_ = os.path.join(path_, 'batch_'+fkey_+'_'+str(batch_size), str(batch_id))
+    # build extended vocabulary
+    fp = open(file_, 'r')
+    ext_vocab = {}
+    for line in fp:
+        arr = re.split('<sec>', line[:-1])
+        dabs = re.split('\s', arr[0])
+        dabs = filter(None, dabs)
+        for wd in dabs:
+            if wd not in vocab2id:
+                ext_vocab[wd] = {}
+        dart = re.split('\s', arr[1])
+        dart = filter(None, dart)
+        for wd in dart:
+            if wd not in vocab2id:
+                ext_vocab[wd] = {}
+    cnt = len(vocab2id)
+    for wd in ext_vocab:
+        ext_vocab[wd] = cnt
+        cnt += 1
+    fp.close()
+    
+    fp = open(file_, 'r')
+    src_arr = []
+    trg_arr = []
+    src_lens = []
+    trg_lens = []
+    for line in fp:
+        arr = re.split('<sec>', line[:-1])
+        dabs = re.split('\s', arr[0])
+        dabs = filter(None, dabs) + ['<stop>']
+        trg_lens.append(len(dabs))
+        
+        dabs2id = [
+            vocab2id[wd] if wd in vocab2id
+            else vocab2id['<unk>']
+            for wd in dabs
+        ]
+        trg_arr.append(dabs2id)
+                
+        dart = re.split('\s', arr[1])
+        dart = filter(None, dart)
+        src_lens.append(len(dart))
+        dart2id = [
+            src_vocab2id[wd] if wd in src_vocab2id
+            else src_vocab2id['<unk>']
+            for wd in dart
+        ]
+        src_arr.append(dart2id)
+    fp.close()
+    
+    src_max_lens = max_lens[0]
+    trg_max_lens = max_lens[1]
+            
+    src_arr = [itm[:src_max_lens] for itm in src_arr]
+    trg_arr = [itm[:trg_max_lens] for itm in trg_arr]
+
+    src_arr = [
+        itm + [src_vocab2id['<pad>']]*(src_max_lens-len(itm))
+        for itm in src_arr
+    ]
+    trg_input_arr = [
+        itm[:-1] + [vocab2id['<pad>']]*(1+trg_max_lens-len(itm))
+        for itm in trg_arr
+    ]
+    trg_output_arr = [
+        itm[1:] + [vocab2id['<pad>']]*(1+trg_max_lens-len(itm))
+        for itm in trg_arr
+    ]
+    
+    src_var = Variable(torch.LongTensor(src_arr))
+    trg_input_var = Variable(torch.LongTensor(trg_input_arr))
+    trg_output_var = Variable(torch.LongTensor(trg_output_arr))
+    
+    return src_var, trg_input_var, trg_output_var
+'''
 Process the minibatch test
 '''
 def process_minibatch_test(batch_id, path_, batch_size, vocab2id, src_lens):
