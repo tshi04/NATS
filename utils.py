@@ -45,6 +45,8 @@ def fast_beam_search(
     beam_attn_ = Variable(torch.FloatTensor(max_len, batch_size, beam_size, src_seq_len).fill_(0.0)).cuda()
     
     for j in range(max_len):
+        if oov_explicit:
+            last_wd[last_wd>=len(vocab2id)] = vocab2id['<unk>']
         if network == 'lstm':
             logits, (h0, c0), h_attn, past_attn, p_gen, attn_, past_dehy = model.forward_onestep_decoder(
                 j, last_wd.view(-1, 1), (h0_new, c0_new),
@@ -56,8 +58,7 @@ def fast_beam_search(
         logits = F.softmax(logits, dim=2)
         if pointer_net:
             if oov_explicit:
-                logits2 = model.cal_dist_explicit(src_text_rep_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
-                logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
+                logits = model.cal_dist_explicit(src_text_rep_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
             else:
                 logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
            

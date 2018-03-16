@@ -410,15 +410,16 @@ if opt.task == 'beam':
                 oov_explicit=opt.oov_explicit)
             src_msk = src_msk.repeat(1, opt.beam_size).view(
                 src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
-            beam_attn_ = beam_attn_*src_msk
+            # copy unknown words
             if opt.copy_words:
+                beam_attn_ = beam_attn_*src_msk
                 beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
                 beam_copy = beam_copy[:, :, 0].transpose(0, 1)
                 wdidx_copy = beam_copy.data.cpu().numpy()
                 for b in range(len(trg_arr)):
                     arr = []
                     gen_text = beam_seq.data.cpu().numpy()[b,0]
-                    gen_text = [id2vocab[wd] for wd in gen_text]
+                    gen_text = [id2vocab[wd] if wd in id2vocab else ext_id2oov[wd] for wd in gen_text]
                     gen_text = gen_text[1:]
                     for j in range(len(gen_text)):
                         if gen_text[j] == '<unk>':
@@ -430,7 +431,7 @@ if opt.task == 'beam':
                 for b in range(len(trg_arr)):
                     arr = []
                     gen_text = beam_seq.data.cpu().numpy()[b,0]
-                    gen_text = [id2vocab[wd] for wd in gen_text]
+                    gen_text = [id2vocab[wd] if wd in id2vocab else ext_id2oov[wd] for wd in gen_text]
                     gen_text = gen_text[1:]
                     arr.append(' '.join(gen_text))
                     arr.append(trg_arr[b])
@@ -462,8 +463,9 @@ if opt.task == 'beam':
                 oov_explicit=opt.oov_explicit)
             src_msk = src_msk.repeat(1, opt.beam_size).view(
                 src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
-            beam_attn_ = beam_attn_*src_msk
+            # copy unknown words
             if opt.copy_words:
+                beam_attn_ = beam_attn_*src_msk
                 beam_copy = beam_attn_.topk(1, dim=3)[1].squeeze(-1)
                 beam_copy = beam_copy[:, :, 0].transpose(0, 1)
                 wdidx_copy = beam_copy.data.cpu().numpy()
