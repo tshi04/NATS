@@ -145,7 +145,8 @@ def fast_beam_search(
         h_attn_new = h_attn_new.view(-1, h_attn_new.size(-1))
         attn_new = attn_new.view(-1, attn_new.size(-1))
         past_attn_new = past_attn_new.view(-1, past_attn_new.size(-1))
-        past_dehy_new = past_dehy_new.view(-1, pdn_size1, pdn_size2)
+        if attn_decoder:
+            past_dehy_new = past_dehy_new.view(-1, pdn_size1, pdn_size2)
         
         torch.cuda.empty_cache()
     return beam_seq, beam_prb, beam_attn_
