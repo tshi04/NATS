@@ -61,7 +61,7 @@ parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_0_5000', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_0_600', help='file for model.')
 
 opt = parser.parse_args()
 
@@ -407,7 +407,9 @@ if opt.task == 'beam':
                 max_len=opt.trg_seq_lens,
                 network=opt.network_,
                 pointer_net=opt.pointer_net,
-                oov_explicit=opt.oov_explicit)
+                oov_explicit=opt.oov_explicit,
+                attn_decoder=opt.attn_decoder
+            )
             src_msk = src_msk.repeat(1, opt.beam_size).view(
                 src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
             # copy unknown words
@@ -460,7 +462,9 @@ if opt.task == 'beam':
                 max_len=opt.trg_seq_lens,
                 network=opt.network_,
                 pointer_net=opt.pointer_net,
-                oov_explicit=opt.oov_explicit)
+                oov_explicit=opt.oov_explicit,
+                attn_decoder=opt.attn_decoder
+            )
             src_msk = src_msk.repeat(1, opt.beam_size).view(
                 src_msk.size(0), opt.beam_size, opt.src_seq_lens).unsqueeze(0)
             # copy unknown words

@@ -26,7 +26,8 @@ def fast_beam_search(
     max_len=20,
     network='lstm',
     pointer_net=True,
-    oov_explicit=True
+    oov_explicit=True,
+    attn_decoder=True
 ):
     batch_size = src_text.size(0)
     src_seq_len = src_text.size(1)
@@ -97,8 +98,9 @@ def fast_beam_search(
         h_attn_new = Variable(torch.zeros(batch_size, beam_size, h_attn.size(-1))).cuda()
         attn_new = Variable(torch.zeros(batch_size, beam_size, attn_.size(-1))).cuda()
         past_attn_new = Variable(torch.zeros(batch_size, beam_size, past_attn.size(-1))).cuda()
-        pdn_size1, pdn_size2 = past_dehy.size(-2), past_dehy.size(-1)
-        past_dehy_new = Variable(torch.zeros(batch_size, beam_size, pdn_size1*pdn_size2)).cuda()
+        if attn_decoder:
+            pdn_size1, pdn_size2 = past_dehy.size(-2), past_dehy.size(-1)
+            past_dehy_new = Variable(torch.zeros(batch_size, beam_size, pdn_size1*pdn_size2)).cuda()
         if network == 'lstm':
             h0 = h0.view(batch_size, beam_size, h0.size(-1))
             h0 = tensor_transformer(h0, batch_size, beam_size)
@@ -113,8 +115,9 @@ def fast_beam_search(
         attn_ = tensor_transformer(attn_, batch_size, beam_size)
         past_attn = past_attn.view(batch_size, beam_size, past_attn.size(-1))
         past_attn = tensor_transformer(past_attn, batch_size, beam_size)
-        past_dehy = past_dehy.contiguous().view(batch_size, beam_size, past_dehy.size(-2)*past_dehy.size(-1))
-        past_dehy = tensor_transformer(past_dehy, batch_size, beam_size)
+        if attn_decoder:
+            past_dehy = past_dehy.contiguous().view(batch_size, beam_size, past_dehy.size(-2)*past_dehy.size(-1))
+            past_dehy = tensor_transformer(past_dehy, batch_size, beam_size)
         tmp_prb, tmp_idx = cand_prob.topk(k=beam_size, dim=1)
         for x in range(batch_size):
             for b in range(beam_size):
@@ -130,6 +133,8 @@ def fast_beam_search(
                 h_attn_new[x, b] = h_attn[x, tmp_idx[x, b]]
                 attn_new[x, b] = attn_[x, tmp_idx[x, b]]
                 past_attn_new[x, b] = past_attn[x, tmp_idx[x, b]]
+                if attn_decoder:
+                    past_dehy_new[x, b] = past_dehy[x, tmp_idx[x, b]]
         
         beam_attn_[j] = attn_new
         if network == 'lstm':
