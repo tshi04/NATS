@@ -714,7 +714,8 @@ class Seq2Seq(torch.nn.Module):
         # extend current structure
         logits_ex = Variable(torch.zeros(1, 1, 1)).cuda()
         logits_ex = logits_ex.repeat(batch_size, trg_seq_len, len(ext_id2oov))
-        logits_ = torch.cat((logits_, logits_ex), -1)
+        if len(ext_id2oov) > 0:
+            logits_ = torch.cat((logits_, logits_ex), -1)
         # pointer
         attn_ = attn_.transpose(0, 1)
         # calculate index matrix
