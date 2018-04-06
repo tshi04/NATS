@@ -527,7 +527,6 @@ if opt.task == 'rouge':
         fout = open(os.path.join(sys_smm_path, 'sum.'+str(cnt).zfill(5)+'.txt'), 'w')
         for sen in rmm:
             arr = re.split('\s', sen)
-            arr = ['' if wd == '<unk>' else wd for wd in arr]
             arr = filter(None, arr)
             dstr = ' '.join(arr)
             fout.write(dstr+'\n')
@@ -535,7 +534,6 @@ if opt.task == 'rouge':
         fout = open(os.path.join(mod_smm_path, 'sum.A.'+str(cnt).zfill(5)+'.txt'), 'w')
         for sen in smm:
             arr = re.split('\s', sen)
-            arr = ['' if wd == '<unk>' else wd for wd in arr]
             arr = filter(None, arr)
             dstr = ' '.join(arr)
             fout.write(dstr+'\n')
