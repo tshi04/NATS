@@ -33,3 +33,6 @@ Please refer these two scripts: https://github.com/tshi04/seq2seq_coverage_ST/tr
 - https://github.com/spro/practical-pytorch
 
 And more.
+
+### Todo
+- util.py change the method to calculate the probability.
