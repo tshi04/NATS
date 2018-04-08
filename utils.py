@@ -88,6 +88,8 @@ def fast_beam_search(
         cand_last_wd = wds.squeeze(2).view(batch_size, -1)
 
         cand_prob = beam_prb.unsqueeze(1).repeat(1, beam_size, 1).transpose(1,2)
+        # here we need to use the new mechanism
+        # cand_prob *= prob[:, :, 0]
         cand_prob += prob[:, :, 0]
         cand_prob = cand_prob.contiguous().view(batch_size, beam_size*beam_size)
         if network == 'lstm':
