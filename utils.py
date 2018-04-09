@@ -41,6 +41,7 @@ def fast_beam_search(
     
     beam_seq = Variable(torch.LongTensor(batch_size, beam_size, max_len+1).fill_(vocab2id['<pad>'])).cuda()
     beam_seq[:, :, 0] = vocab2id['<s>']
+    #beam_prb = torch.FloatTensor(batch_size, beam_size).fill_(1.0)
     beam_prb = torch.FloatTensor(batch_size, beam_size).fill_(0.0)
     last_wd = Variable(torch.LongTensor(batch_size, beam_size, 1).fill_(vocab2id['<s>'])).cuda()
     beam_attn_ = Variable(torch.FloatTensor(max_len, batch_size, beam_size, src_seq_len).fill_(0.0)).cuda()
