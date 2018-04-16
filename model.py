@@ -414,7 +414,8 @@ class Seq2Seq(torch.nn.Module):
         network_='lstm',
         pointer_net=False,
         shared_emb=True,
-        attn_decoder=False
+        attn_decoder=False,
+        share_emb_weight=False
     ):
         super(Seq2Seq, self).__init__()
         # parameters
@@ -435,6 +436,7 @@ class Seq2Seq(torch.nn.Module):
         self.pointer_net = pointer_net
         self.shared_emb = shared_emb
         self.attn_decoder = attn_decoder
+        self.share_emb_weight = share_emb_weight
         # bidirection encoder
         self.src_num_directions = 1
         if self.src_bidirect:
@@ -501,10 +503,20 @@ class Seq2Seq(torch.nn.Module):
             self.src_hidden_dim*self.src_num_directions,
             self.trg_hidden_dim).cuda()
         # decoder to vocab
-        self.decoder2vocab = torch.nn.Linear(
-            self.trg_hidden_dim,
-            self.trg_vocab_size,
-            bias=True).cuda()
+        if self.share_emb_weight:
+            self.decoder2proj = torch.nn.Linear(
+                self.trg_hidden_dim,
+                self.src_emb_dim,
+                bias=False).cuda()
+            self.proj2vocab = torch.nn.Embedding(
+                self.src_emb_dim,
+                self.trg_vocab_size).cuda()
+            self.proj2vocab.weight.data = self.embedding.weight.data.transpose(0,1)
+        else:
+            self.decoder2vocab = torch.nn.Linear(
+                self.trg_hidden_dim,
+                self.trg_vocab_size,
+                bias=True).cuda()
         
     def forward(self, input_src, input_trg):
         # parameters
@@ -582,7 +594,11 @@ class Seq2Seq(torch.nn.Module):
         trg_h_reshape = trg_h.contiguous().view(
             trg_h.size(0)*trg_h.size(1), trg_h.size(2))
         # consume a lot of memory.
-        decoder_output = self.decoder2vocab(trg_h_reshape)
+        if self.share_emb_weight:
+            decoder_output = self.decoder2vocab(trg_h_reshape)
+        else:
+            decoder_proj = self.decoder2proj(trg_h_reshape)
+            decoder_output = self.proj2vocab(decoder_proj)
         decoder_output = decoder_output.view(
             trg_h.size(0), trg_h.size(1), decoder_output.size(1))
 
@@ -683,7 +699,11 @@ class Seq2Seq(torch.nn.Module):
         # prepare output
         trg_h_reshape = trg_h.contiguous().view(
             trg_h.size(0) * trg_h.size(1), trg_h.size(2))
-        decoder_output = self.decoder2vocab(trg_h_reshape)
+        if self.share_emb_weight:
+            decoder_output = self.decoder2vocab(trg_h_reshape)
+        else:
+            decoder_proj = self.decoder2proj(trg_h_reshape)
+            decoder_output = self.proj2vocab(decoder_proj)
         decoder_output = decoder_output.view(
             trg_h.size(0), trg_h.size(1), decoder_output.size(1))
 

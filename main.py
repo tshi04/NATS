@@ -47,6 +47,7 @@ parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
 parser.add_argument('--attn_decoder', type=bool, default=False, help='attention decoder?')
 parser.add_argument('--oov_explicit', type=bool, default=True, help='explicit OOV?')
+parser.add_argument('--share_emb_weight', type=bool, default=False, help='share_emb_weight')
 
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
@@ -109,7 +110,8 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
         network_=opt.network_,
         pointer_net=opt.pointer_net,
         shared_emb=opt.shared_embedding,
-        attn_decoder=opt.attn_decoder
+        attn_decoder=opt.attn_decoder,
+        share_emb_weight=opt.share_emb_weight
     ).cuda()
     print model
 '''
