@@ -41,8 +41,7 @@ def fast_beam_search(
     
     beam_seq = Variable(torch.LongTensor(batch_size, beam_size, max_len+1).fill_(vocab2id['<pad>'])).cuda()
     beam_seq[:, :, 0] = vocab2id['<s>']
-    #beam_prb = torch.FloatTensor(batch_size, beam_size).fill_(1.0)
-    beam_prb = torch.FloatTensor(batch_size, beam_size).fill_(0.0)
+    beam_prb = torch.FloatTensor(batch_size, beam_size).fill_(1.0)
     last_wd = Variable(torch.LongTensor(batch_size, beam_size, 1).fill_(vocab2id['<s>'])).cuda()
     beam_attn_ = Variable(torch.FloatTensor(max_len, batch_size, beam_size, src_seq_len).fill_(0.0)).cuda()
     
@@ -89,9 +88,7 @@ def fast_beam_search(
         cand_last_wd = wds.squeeze(2).view(batch_size, -1)
 
         cand_prob = beam_prb.unsqueeze(1).repeat(1, beam_size, 1).transpose(1,2)
-        # here we need to use the new mechanism
-        # cand_prob *= prob[:, :, 0]
-        cand_prob += prob[:, :, 0]
+        cand_prob *= prob[:, :, 0]
         cand_prob = cand_prob.contiguous().view(batch_size, beam_size*beam_size)
         if network == 'lstm':
             h0_new = Variable(torch.zeros(batch_size, beam_size, h0.size(-1))).cuda()
