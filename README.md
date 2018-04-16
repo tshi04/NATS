@@ -1,10 +1,16 @@
 # Text summarization
 
-Abstractive Text Summarization: A Review.
+Abstractive Text Summarization with Attentive Sequence-to-Sequence Models: Basic Elements
 
-### Package Required
-1. Pytorch 0.3.0.post4
-Please refer these two scripts: https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG
+### Requirements
+- Python 2.7
+- glob
+- argparse
+- shutil
+- Pytorch 0.3.0.post4
+
+Please refer these two scripts: 
+https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG
 
 
 ### Note
