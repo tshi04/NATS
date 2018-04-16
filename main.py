@@ -45,9 +45,9 @@ parser.add_argument('--attn_method', default='luong_general', help='luong_dot | 
 parser.add_argument('--coverage', default='temporal', help='vanilla | temporal | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
-parser.add_argument('--attn_decoder', type=bool, default=False, help='attention decoder?')
+parser.add_argument('--attn_decoder', type=bool, default=True, help='attention decoder?')
 parser.add_argument('--oov_explicit', type=bool, default=True, help='explicit OOV?')
-parser.add_argument('--share_emb_weight', type=bool, default=False, help='share_emb_weight')
+parser.add_argument('--share_emb_weight', type=bool, default=True, help='share_emb_weight')
 
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
