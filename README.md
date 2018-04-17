@@ -32,6 +32,7 @@ python main.py --task beam --batch_size 4
 - Rouge
 ```
 python main.py --task rouge
+run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
 ```
 
 ## Problem
