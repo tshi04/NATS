@@ -17,19 +17,19 @@ to setup AWS K80.
 
 Please set parameters within the main.py file.
 
-- Training
+#### Training
 ```
 python main.py 
 ```
-- Validate
+#### Validate
 ```
 python main.py --task validate --batch_size 10
 ```
-- Test
+#### Test
 ```
 python main.py --task beam --batch_size 4
 ```
-- Rouge
+#### Rouge
 ```
 python main.py --task rouge
 run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
