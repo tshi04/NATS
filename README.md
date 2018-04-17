@@ -10,8 +10,10 @@ Abstractive Text Summarization with Attentive Sequence-to-Sequence Models: Basic
 - shutil
 - Pytorch 0.3.0.post4
 
-You can use these two [scripts](https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG)
-to setup AWS K80.
+Use following scripts to setup
+- [AWS Tesla K80](https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG)
+- [pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum_ST/tree/master/tools/ROUGE)
+
 
 ## Usuage
 
