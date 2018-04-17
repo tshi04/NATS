@@ -15,7 +15,7 @@ to setup AWS K80.
 
 ## Usuage
 
-Please set parameters within the main.py file.
+Please set bool type parameters in the main.py file.
 
 #### Training
 ```
@@ -42,7 +42,6 @@ run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
 concat + temporal
 concat + temporal + attn_decoder
 ```
-
 
 ## Git Referenced
 
