@@ -46,7 +46,7 @@ concat + temporal + attn_decoder
 ```
 - The memory usage has been optmized, but we are not satisfied with it.
 
-## Git Referenced
+## Git References
 
 - https://github.com/abisee/pointer-generator.git
 - https://github.com/MaximumEntropy/Seq2Seq-PyTorch
