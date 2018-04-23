@@ -39,11 +39,12 @@ run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
 
 ## Problem
 
-1. The following combination failed during the training.
+- The following combination failed during the training.
 ```
 concat + temporal
 concat + temporal + attn_decoder
 ```
+- The memory usage has been optmized, but we are not satisfied with it.
 
 ## Git Referenced
 
