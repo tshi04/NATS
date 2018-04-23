@@ -45,6 +45,7 @@ concat + temporal
 concat + temporal + attn_decoder
 ```
 - The memory usage has been optmized, but we are not satisfied with it.
+- Merge the LSTM and GRU decoders.
 
 ## Git References
 
