@@ -37,9 +37,9 @@ python main.py --task rouge
 run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
 ```
 
-## Problem
+## Problems and Todos
 
-- The following combination failed during the training.
+- The following combinations failed during the training after several epochs.
 ```
 concat + temporal
 concat + temporal + attn_decoder
