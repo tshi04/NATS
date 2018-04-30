@@ -2,6 +2,8 @@
 
 Abstractive Text Summarization with Attentive Sequence-to-Sequence Models: Basic Elements.
 
+Bug report tshi at vt dot edu.
+
 ## Requirements
 
 - Python 2.7
