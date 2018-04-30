@@ -1,8 +1,7 @@
 # Text summarization
 
-Abstractive Text Summarization with Attentive Sequence-to-Sequence Models: Basic Elements.
-
-Bug report tshi at vt dot edu.
+- A Survey on the Single-Document Abstractive Summarization with Sequence-to-Sequence models
+- Bug report tshi at vt dot edu.
 
 ## Requirements
 
