@@ -76,6 +76,9 @@ else:
 if opt.oov_explicit:
     opt.shared_embedding = True
     
+if not opt.task == 'train':
+    opt.dropout = 0.0
+    
 vocab2id, id2vocab = construct_vocab(
     file_=opt.data_dir+'/'+opt.file_vocab,
     max_size=opt.vocab_size,
