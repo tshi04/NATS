@@ -45,7 +45,7 @@ run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
 concat + temporal
 concat + temporal + attn_decoder
 ```
-- The memory usage has been optmized, but we are not satisfied with it.
+- We have tried to optimize the memory usage, but we are still not quite happy with it.
 - Merge the LSTM and GRU decoders.
 
 ## Git References
