@@ -1,6 +1,7 @@
+******
 # Text summarization
-
-- A Survey on the Single-Document Abstractive Summarization with Sequence-to-Sequence models
+******
+- A Survey on the Abstractive Summarization with Sequence-to-Sequence models
 - Bug report tshi at vt dot edu.
 
 ## Requirements
@@ -14,7 +15,6 @@
 Use following scripts to setup
 - [AWS Tesla K80](https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG)
 - [pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum_ST/tree/master/tools/ROUGE)
-
 
 ## Usuage
 
