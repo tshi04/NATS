@@ -1,6 +1,5 @@
-******
 # Text summarization
-******
+
 - A Survey on the Abstractive Summarization with Sequence-to-Sequence models
 - Bug report tshi at vt dot edu.
 
