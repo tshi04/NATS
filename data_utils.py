@@ -22,7 +22,7 @@ def construct_vocab(file_, max_size=200000, mincount=5):
     cnt = 5
     with open(file_, 'r') as fp:
         for line in fp:
-            arr = re.split('\s', line[:-1])
+            arr = re.split(' ', line[:-1])
             if arr[0] == ' ':
                 continue
             if arr[0] in word_pad:
@@ -93,7 +93,7 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
-        dabs = filter(None, dabs) + ['<stop>']
+        dabs = list(filter(None, dabs)) + ['<stop>']
         trg_lens.append(len(dabs))
         
         dabs2id = [
@@ -104,7 +104,7 @@ def process_minibatch(batch_id, path_, fkey_, batch_size, src_vocab2id, vocab2id
         trg_arr.append(dabs2id)
                 
         dart = re.split('\s', arr[1])
-        dart = filter(None, dart)
+        dart = list(filter(None, dart))
         src_lens.append(len(dart))
         dart2id = [
             src_vocab2id[wd] if wd in src_vocab2id
@@ -152,12 +152,12 @@ def process_minibatch_explicit(batch_id, path_, fkey_, batch_size, vocab2id, max
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
-        dabs = filter(None, dabs)
+        dabs = list(filter(None, dabs))
         for wd in dabs:
             if wd not in vocab2id:
                 ext_vocab[wd] = {}
         dart = re.split('\s', arr[1])
-        dart = filter(None, dart)
+        dart = list(filter(None, dart))
         for wd in dart:
             if wd not in vocab2id:
                 ext_vocab[wd] = {}
@@ -179,7 +179,7 @@ def process_minibatch_explicit(batch_id, path_, fkey_, batch_size, vocab2id, max
         # abstract
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
-        dabs = filter(None, dabs) + ['<stop>']
+        dabs = list(filter(None, dabs)) + ['<stop>']
         trg_lens.append(len(dabs))
         # UNK
         dabs2id = [
@@ -197,7 +197,7 @@ def process_minibatch_explicit(batch_id, path_, fkey_, batch_size, vocab2id, max
         trg_arr_ex.append(dabs2id)
         # article
         dart = re.split('\s', arr[1])
-        dart = filter(None, dart)
+        dart = list(filter(None, dart))
         src_lens.append(len(dart))
         # UNK
         dart2id = [
@@ -263,12 +263,12 @@ def process_minibatch_test(batch_id, path_, batch_size, vocab2id, src_lens):
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
-        dabs = filter(None, dabs)
+        dabs = list(filter(None, dabs))
         dabs = ' '.join(dabs)
         trg_arr.append(dabs)
         
         dart = re.split('\s', arr[1])
-        dart = filter(None, dart)
+        dart = list(filter(None, dart))
         src_arr.append(dart)
         dart2id = [vocab2id[wd] if wd in vocab2id else vocab2id['<unk>'] for wd in dart]
         src_idx.append(dart2id)
@@ -302,7 +302,7 @@ def process_minibatch_explicit_test(batch_id, path_, batch_size, vocab2id, src_l
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dart = re.split('\s', arr[1])
-        dart = filter(None, dart)
+        dart = list(filter(None, dart))
         for wd in dart:
             if wd not in vocab2id:
                 ext_vocab[wd] = {}
@@ -322,12 +322,12 @@ def process_minibatch_explicit_test(batch_id, path_, batch_size, vocab2id, src_l
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         dabs = re.split('\s', arr[0])
-        dabs = filter(None, dabs)
+        dabs = list(filter(None, dabs))
         dabs = ' '.join(dabs)
         trg_arr.append(dabs)
         
         dart = re.split('\s', arr[1])
-        dart = filter(None, dart)
+        dart = list(filter(None, dart))
         src_arr.append(dart)
         dart2id = [vocab2id[wd] if wd in vocab2id else vocab2id['<unk>'] for wd in dart]
         src_idx.append(dart2id)

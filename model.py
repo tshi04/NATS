@@ -247,7 +247,7 @@ class LSTMDecoder(torch.nn.Module):
                     pt_input = torch.cat((input_[k], hidden_[0], c_encoder, c_decoder), 1)
                 else:
                     pt_input = torch.cat((input_[k], hidden_[0], c_encoder), 1)
-                p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
+                p_gen[:, k] = F.sigmoid(self.pt_out(pt_input).squeeze(1))
                     
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
@@ -378,7 +378,7 @@ class GRUDecoder(torch.nn.Module):
                     pt_input = torch.cat((input_[k], hidden_, c_encoder, c_decoder), 1)
                 else:
                     pt_input = torch.cat((input_[k], hidden_, c_encoder), 1)
-                p_gen[:, k] = F.sigmoid(self.pt_out(pt_input))
+                p_gen[:, k] = F.sigmoid(self.pt_out(pt_input).squeeze(1))
             
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
@@ -447,16 +447,16 @@ class Seq2Seq(torch.nn.Module):
             self.embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
                 self.src_emb_dim).cuda()
-            torch.nn.init.uniform(self.embedding.weight, -1.0, 1.0)
+            torch.nn.init.uniform_(self.embedding.weight, -1.0, 1.0)
         else:
             self.src_embedding = torch.nn.Embedding(
                 self.src_vocab_size,
                 self.src_emb_dim).cuda()
-            torch.nn.init.uniform(self.src_embedding.weight, -1.0, 1.0)
+            torch.nn.init.uniform_(self.src_embedding.weight, -1.0, 1.0)
             self.trg_embedding = torch.nn.Embedding(
                 self.trg_vocab_size,
                 self.trg_emb_dim).cuda()
-            torch.nn.init.uniform(self.trg_embedding.weight, -1.0, 1.0)
+            torch.nn.init.uniform_(self.trg_embedding.weight, -1.0, 1.0)
         # network structure
         if self.network_ == 'lstm':
             # encoder

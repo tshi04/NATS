@@ -34,7 +34,7 @@ parser.add_argument('--src_num_layers', type=int, default=1, help='encoder numbe
 parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
 parser.add_argument('--word_mincount', type=int, default=5, help='min word frequency')
-parser.add_argument('--src_vocab_size', type=int, default=150000, help='max number of words in the vocabulary.')
+parser.add_argument('--src_vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
 parser.add_argument('--src_word_mincount', type=int, default=5, help='min word frequency')
 parser.add_argument('--src_bidirection', type=bool, default=True, help='encoder bidirectional?')
 parser.add_argument('--batch_first', type=bool, default=True, help='batch first?')
@@ -45,7 +45,7 @@ parser.add_argument('--attn_method', default='luong_general', help='luong_dot | 
 parser.add_argument('--coverage', default='temporal', help='vanilla | temporal | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
-parser.add_argument('--attn_decoder', type=bool, default=True, help='attention decoder?')
+parser.add_argument('--attn_decoder', type=bool, default=False, help='attention decoder?')
 parser.add_argument('--oov_explicit', type=bool, default=True, help='explicit OOV?')
 parser.add_argument('--share_emb_weight', type=bool, default=True, help='share_emb_weight')
 
@@ -62,7 +62,7 @@ parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_0_600', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
 
 opt = parser.parse_args()
 
@@ -84,7 +84,7 @@ vocab2id, id2vocab = construct_vocab(
     max_size=opt.vocab_size,
     mincount=opt.word_mincount
 )
-print 'The vocabulary size: {0}'.format(len(vocab2id))
+print('The vocabulary size: {}'.format(len(vocab2id)))
 src_vocab2id = vocab2id
 src_id2vocab = id2vocab
 if not opt.shared_embedding:
@@ -93,7 +93,7 @@ if not opt.shared_embedding:
         max_size=opt.src_vocab_size,
         mincount=opt.src_word_mincount
     )
-    print 'The vocabulary size: {0}'.format(len(src_vocab2id))
+    print('The vocabulary size: {}'.format(len(src_vocab2id)))
 
 if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
     model = Seq2Seq(
@@ -116,7 +116,7 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
         attn_decoder=opt.attn_decoder,
         share_emb_weight=opt.share_emb_weight
     ).cuda()
-    print model
+    print(model)
 '''
 train
 '''
@@ -156,7 +156,7 @@ if opt.task == 'train':
             file_=opt.file_corpus,
             batch_size=opt.batch_size
         )
-        print 'The number of batches: {0}'.format(n_batch)
+        print('The number of batches: {}'.format(n_batch))
         for batch_id in range(n_batch):
             if cclb == 0 and batch_id <= uf_model[1]:
                 continue
@@ -213,25 +213,25 @@ if opt.task == 'train':
                 loss = loss_criterion(
                     logits.contiguous().view(-1, len(vocab2id)),
                     trg_output_var.view(-1))
-            
+
             if opt.coverage == 'asee_train':
-                loss = loss + loss_cv
+                loss = loss + loss_cv[0]
             
             optimizer.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm(model.parameters(), opt.grad_clip)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), opt.grad_clip)
             optimizer.step()
         
             end_time = time.time()
             losses.append([
                 epoch, batch_id, 
-                loss.data.cpu().numpy()[0], 
+                loss.data.cpu().numpy(), 
                 loss_cv.data.cpu().numpy()[0], 
                 (end_time-start_time)/3600.0])
             if batch_id%opt.checkpoint == 0:
                 loss_np = np.array(losses)
                 np.save(out_dir+'/loss', loss_np)
-                fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'w')
+                fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'wb')
                 torch.save(model.state_dict(), fmodel)
                 fmodel.close()
             if batch_id%1 == 0:
@@ -240,13 +240,13 @@ if opt.task == 'train':
                     sen_pred = [id2vocab[x] if x in id2vocab else ext_id2oov[x] for x in word_prob[0]]
                 else:
                     sen_pred = [id2vocab[x] for x in word_prob[0]]
-                print 'epoch={0}, batch={1}, loss={2}, loss_cv={3}, time_escape={4}s={5}h'.format(
+                print('epoch={}, batch={}, loss={}, loss_cv={}, time_escape={}s={}h'.format(
                     epoch, batch_id, 
-                    loss.data.cpu().numpy()[0], 
+                    loss.data.cpu().numpy(), 
                     loss_cv.data.cpu().numpy()[0],
                     end_time-start_time, (end_time-start_time)/3600.0
-                )
-                print ' '.join(sen_pred)
+                ))
+                print(' '.join(sen_pred))
             if opt.debug:
                 break
             del logits, attn_, p_gen, loss_cv, loss
@@ -255,7 +255,7 @@ if opt.task == 'train':
         
         loss_np = np.array(losses)
         np.save(out_dir+'/loss', loss_np)
-        fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'w')
+        fmodel = open(os.path.join(out_dir, 'seq2seq_'+str(epoch)+'_'+str(batch_id)+'.model'), 'wb')
         torch.save(model.state_dict(), fmodel)
         fmodel.close()
             
@@ -296,7 +296,7 @@ if opt.task == 'validate':
                 file_=opt.file_val,
                 batch_size=opt.batch_size
             )
-            print 'The number of batches (test): {0}'.format(val_batch)
+            print('The number of batches (test): {}'.format(val_batch))
             if opt.val_num_batch > val_batch:
                 opt.val_num_batch = val_batch
             for batch_id in range(opt.val_num_batch):
@@ -349,17 +349,16 @@ if opt.task == 'validate':
                         logits.contiguous().view(-1, len(vocab2id)),
                         trg_output_var.view(-1))
                 
-                loss = loss + loss_cv
-                losses.append(loss.data.cpu().numpy()[0])
+                losses.append(loss.data.cpu().numpy())
                 if batch_id%10 == 0:
-                    print batch_id,
+                    print(batch_id, end=' ')
                 del logits, attn_, p_gen, loss_cv, loss
-            print
+            print()
             losses = np.array(losses)
             end_time = time.time()
             best_arr.append([fl_, np.average(losses), end_time-start_time])
             for itm in best_arr[:opt.nbestmodel]:
-                print 'model={0}, loss={1}, time={2}'.format(itm[0], itm[1], itm[2])
+                print('model={}, loss={}, time={}'.format(itm[0], itm[1], itm[2]))
             
             best_arr = sorted(best_arr, key=lambda bb: bb[1])
             for itm in best_arr[opt.nbestmodel:]:
@@ -384,7 +383,7 @@ if opt.task == 'beam':
         file_=opt.file_test,
         batch_size=opt.batch_size
     )
-    print 'The number of batches (test): {0}'.format(test_batch)
+    print('The number of batches (test): {}'.format(test_batch))
     
     model.load_state_dict(torch.load(
         os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
