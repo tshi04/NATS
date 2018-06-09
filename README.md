@@ -5,11 +5,11 @@
 
 ## Requirements
 
-- Python 2.7
+- Python 3.5.2
 - glob
 - argparse
 - shutil
-- Pytorch 0.3.0.post4
+- Pytorch 0.4.0
 
 Use following scripts to setup
 - [AWS Tesla K80](https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG)
