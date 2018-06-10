@@ -3,7 +3,7 @@ cp ROUGE-1.5.5.tar.gz ~
 tar -xvf ~/ROUGE-1.5.5.tar.gz --directory ~
 rm ~/ROUGE-1.5.5.tar.gz
 sudo apt install libxml-parser-perl
-sudo pip install pyrouge
+sudo pip3 install pyrouge
 
 cd ~/ROUGE-1.5.5/data/
 rm WordNet-2.0.exc.db
