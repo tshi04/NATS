@@ -518,27 +518,27 @@ if opt.task == 'rouge':
     for line in fp:
         arr = re.split('<sec>', line[:-1])
         rmm = re.split('<pad>|<s>|</s>', arr[1])
-        rmm = filter(None, rmm)
-        rmm = [' '.join(filter(None, re.split('\s', sen))) for sen in rmm]
-        rmm = filter(None, rmm)
+        rmm = list(filter(None, rmm))
+        rmm = [' '.join(list(filter(None, re.split('\s', sen)))) for sen in rmm]
+        rmm = list(filter(None, rmm))
         
         smm = re.split('<stop>', arr[0])
-        smm = filter(None, smm)
+        smm = list(filter(None, smm))
         smm = re.split('<pad>|<s>|</s>', smm[0])
-        smm = filter(None, smm)
-        smm = [' '.join(filter(None, re.split('\s', sen))) for sen in smm]
-        smm = filter(None, smm)
+        smm = list(filter(None, smm))
+        smm = [' '.join(list(filter(None, re.split('\s', sen)))) for sen in smm]
+        smm = list(filter(None, smm))
         fout = open(os.path.join(sys_smm_path, 'sum.'+str(cnt).zfill(5)+'.txt'), 'w')
         for sen in rmm:
             arr = re.split('\s', sen)
-            arr = filter(None, arr)
+            arr = list(filter(None, arr))
             dstr = ' '.join(arr)
             fout.write(dstr+'\n')
         fout.close()
         fout = open(os.path.join(mod_smm_path, 'sum.A.'+str(cnt).zfill(5)+'.txt'), 'w')
         for sen in smm:
             arr = re.split('\s', sen)
-            arr = filter(None, arr)
+            arr = list(filter(None, arr))
             dstr = ' '.join(arr)
             fout.write(dstr+'\n')
         fout.close()
