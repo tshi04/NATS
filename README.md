@@ -1,7 +1,8 @@
 # Text summarization
 
-- A Survey on the Abstractive Summarization with Sequence-to-Sequence models
+- Neural Abstractive Summarization with Sequence-to-Sequence models
 - Bug report tshi at vt dot edu.
+- Previous version with python2.7 can be found [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7). 
 
 ## Requirements
 
@@ -9,15 +10,21 @@
 - glob
 - argparse
 - shutil
-- Pytorch 0.4.0
+- pytorch 0.4.0
 
 Use following scripts to setup
-- [AWS Tesla K80](https://github.com/tshi04/seq2seq_coverage_ST/tree/master/tools/CONFIG)
-- [pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum_ST/tree/master/tools/ROUGE)
+- [Tesla K80](https://github.com/tshi04/textsum/tree/master/tools/config_server)
+- [Tesla V100](https://github.com/tshi04/SetEC2)
+- [pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum/tree/master/tools/rouge_package)
 
 ## Usuage
 
-Please set bool type parameters in the main.py file.
+#### Dataset
+
+- [CNN/Daily Mail](https://github.com/abisee/pointer-generator)
+- [newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
+
+Note: Please set bool type parameters in the main.py file.
 
 #### Training
 ```
@@ -46,10 +53,3 @@ concat + temporal + attn_decoder
 ```
 - We have tried to optimize the memory usage, but we are still not quite happy with it.
 - Merge the LSTM and GRU decoders.
-
-## Git References
-
-- https://github.com/abisee/pointer-generator.git
-- https://github.com/MaximumEntropy/Seq2Seq-PyTorch
-- https://github.com/OpenNMT/OpenNMT
-- https://github.com/spro/practical-pytorch
