@@ -52,7 +52,7 @@ def process_data(input_):
     return '<sec>'.join(sen_arr)
 
 fout = open('cornlp_data/test.txt', 'w')
-fp = jsonl.open('extract_data2/test.data', gzip=True)
+fp = jsonl.open('extract_data/test.data', gzip=True)
 cnt = 0
 batcher = []
 start = time.time()
@@ -83,7 +83,7 @@ fp.close()
 fout.close()
 
 fout = open('cornlp_data/dev.txt', 'w')
-fp = jsonl.open('extract_data2/dev.data', gzip=True)
+fp = jsonl.open('extract_data/dev.data', gzip=True)
 cnt = 0
 batcher = []
 for line in fp:
@@ -112,7 +112,7 @@ fp.close()
 fout.close()
 
 fout = open('cornlp_data/train.txt', 'w')
-fp = jsonl.open('extract_data2/train.data', gzip=True)
+fp = jsonl.open('extract_data/train.data', gzip=True)
 cnt = 0
 batcher = []
 for line in fp:
