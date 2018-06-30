@@ -28,10 +28,9 @@ parser.add_argument('--src_seq_lens', type=int, default=400, help='length of sou
 parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
 parser.add_argument('--src_emb_dim', type=int, default=128, help='source embedding dimension')
 parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embedding dimension')
-parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
+parser.add_argument('--src_hidden_dim', type=int, default=400, help='encoder hidden dimension')
 parser.add_argument('--trg_hidden_dim', type=int, default=256, help='decoder hidden dimension')
 parser.add_argument('--src_num_layers', type=int, default=1, help='encoder number layers')
-parser.add_argument('--trg_num_layers', type=int, default=1, help='decoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
 parser.add_argument('--word_mincount', type=int, default=5, help='min word frequency')
 parser.add_argument('--src_vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
@@ -45,7 +44,7 @@ parser.add_argument('--attn_method', default='luong_general', help='luong_dot | 
 parser.add_argument('--coverage', default='temporal', help='vanilla | temporal | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
-parser.add_argument('--attn_decoder', type=bool, default=False, help='attention decoder?')
+parser.add_argument('--attn_decoder', type=bool, default=True, help='attention decoder?')
 parser.add_argument('--oov_explicit', type=bool, default=True, help='explicit OOV?')
 parser.add_argument('--share_emb_weight', type=bool, default=True, help='share_emb_weight')
 
@@ -73,6 +72,7 @@ if opt.pointer_net:
 else:
     opt.copy_words = False
     opt.coverage = 'vanilla'
+    opt.oov_explicit = False
 if opt.oov_explicit:
     opt.shared_embedding = True
     
@@ -104,7 +104,6 @@ if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
         src_vocab_size=len(src_vocab2id),
         trg_vocab_size=len(vocab2id),
         src_nlayer=opt.src_num_layers,
-        trg_nlayer=opt.trg_num_layers,
         batch_first=opt.batch_first,
         src_bidirect=opt.src_bidirection,
         dropout=opt.dropout,

@@ -53,5 +53,3 @@ concat + temporal + attn_decoder
 ```
 - We have tried to optimize the memory usage, but we are still not quite happy with it.
 - Merge the LSTM and GRU decoders.
-- The src_hidden_dim and tar_hidden_dim have not been correctly implemented, they must be the same currently.
-- The n_layers for the decoder does not work, remove it and use the single layer only.

@@ -23,30 +23,32 @@ class AttentionEncoder(torch.nn.Module):
     
     def __init__(
         self,
-        hidden_size,
+        src_hidden_size,
+        trg_hidden_size,
         attn_method,
         coverage,
     ):
         super(AttentionEncoder, self).__init__()
         self.method = attn_method.lower()
-        self.hidden_size = hidden_size
+        self.src_hidden_size = src_hidden_size
+        self.trg_hidden_size = trg_hidden_size
         self.coverage = coverage
         
         if self.method == 'luong_concat':
             self.attn_en_in = torch.nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
+                self.src_hidden_size,
+                self.trg_hidden_size,
                 bias=True).cuda()
             self.attn_de_in = torch.nn.Linear(
-                self.hidden_size,
-                self.hidden_size,
+                self.trg_hidden_size,
+                self.trg_hidden_size,
                 bias=False).cuda()
-            self.attn_cv_in = torch.nn.Linear(1, self.hidden_size, bias=False).cuda()
-            self.attn_warp_in = torch.nn.Linear(self.hidden_size, 1, bias=False).cuda()
+            self.attn_cv_in = torch.nn.Linear(1, self.trg_hidden_size, bias=False).cuda()
+            self.attn_warp_in = torch.nn.Linear(self.trg_hidden_size, 1, bias=False).cuda()
         if self.method == 'luong_general':
             self.attn_in = torch.nn.Linear(
-                self.hidden_size, 
-                self.hidden_size,
+                self.src_hidden_size,
+                self.trg_hidden_size,
                 bias=False).cuda()
 
     def forward(self, dehy, enhy, past_attn):
@@ -135,8 +137,8 @@ class LSTMDecoder(torch.nn.Module):
     def __init__(
         self,
         input_size,
-        hidden_size,
-        num_layers,
+        src_hidden_size,
+        trg_hidden_size,
         attn_method,
         coverage,
         batch_first,
@@ -146,8 +148,8 @@ class LSTMDecoder(torch.nn.Module):
         super(LSTMDecoder, self).__init__()
         # parameters
         self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.n_layer = num_layers
+        self.src_hidden_size = src_hidden_size
+        self.trg_hidden_size = trg_hidden_size
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
@@ -155,34 +157,35 @@ class LSTMDecoder(torch.nn.Module):
         self.attn_decoder = attn_decoder
         
         self.lstm_ = torch.nn.LSTMCell(
-            self.input_size+self.hidden_size, 
-            self.hidden_size).cuda()
+            self.input_size+self.trg_hidden_size, 
+            self.trg_hidden_size).cuda()
         self.encoder_attn_layer = AttentionEncoder(
-            hidden_size=self.hidden_size,
+            src_hidden_size=self.src_hidden_size,
+            trg_hidden_size=self.trg_hidden_size,
             attn_method=self.attn_method, 
             coverage=self.coverage).cuda()
         # intra-decoder
         if self.attn_decoder:           
             self.decoder_attn_layer = AttentionDecoder(
-                hidden_size=self.hidden_size,
+                hidden_size=self.trg_hidden_size,
                 attn_method=self.attn_method).cuda()
             self.attn_out = torch.nn.Linear(
-                self.hidden_size*3,
-                self.hidden_size,
+                self.src_hidden_size+self.trg_hidden_size*2,
+                self.trg_hidden_size,
                 bias=True).cuda()
         else:
             self.attn_out = torch.nn.Linear(
-                self.hidden_size*2,
-                self.hidden_size,
+                self.src_hidden_size+self.trg_hidden_size,
+                self.trg_hidden_size,
                 bias=True).cuda()
         # pointer generator network
         if self.pointer_net:
             if self.attn_decoder:   
                 self.pt_out = torch.nn.Linear(
-                    self.input_size+self.hidden_size*3, 1).cuda()
+                    self.input_size+self.src_hidden_size+self.trg_hidden_size*2, 1).cuda()
             else:
                 self.pt_out = torch.nn.Linear(
-                    self.input_size+self.hidden_size*2, 1).cuda()
+                    self.input_size+self.src_hidden_size+self.trg_hidden_size, 1).cuda()
         
     def forward(
         self, idx, input_, hidden_, h_attn, 
@@ -207,7 +210,7 @@ class LSTMDecoder(torch.nn.Module):
             if self.attn_decoder:
                 if k + idx == 0:
                     c_decoder = Variable(torch.zeros(
-                        batch_size, self.hidden_size)).cuda()
+                        batch_size, self.trg_hidden_size)).cuda()
                 else:
                     c_decoder, attn_de = self.decoder_attn_layer(
                         hidden_[0], past_dehy)
@@ -217,9 +220,9 @@ class LSTMDecoder(torch.nn.Module):
                     past_dehy = hidden_[0].unsqueeze(0) # seqL*batch*hidden
                     past_dehy = past_dehy.transpose(0, 1) # batch*seqL*hidden
                 else:
-                    past_dehy = past_dehy.contiguous().view(-1, self.hidden_size) # seqL*batch**hidden
+                    past_dehy = past_dehy.contiguous().view(-1, self.trg_hidden_size) # seqL*batch**hidden
                     past_dehy = torch.cat((past_dehy, hidden_[0]), 0) # (seqL+1)*batch**hidden
-                    past_dehy = past_dehy.view(de_idx+1, batch_size, self.hidden_size) # (seqL+1)*batch*hidden
+                    past_dehy = past_dehy.view(de_idx+1, batch_size, self.trg_hidden_size) # (seqL+1)*batch*hidden
                     past_dehy = past_dehy.transpose(0, 1) # batch*(seqL+1)*hidden
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_[0]), 1))
             else:
@@ -267,8 +270,8 @@ class GRUDecoder(torch.nn.Module):
     def __init__(
         self,
         input_size,
-        hidden_size,
-        num_layers,
+        src_hidden_size,
+        trg_hidden_size,
         attn_method,
         coverage,
         batch_first,
@@ -278,8 +281,8 @@ class GRUDecoder(torch.nn.Module):
         super(GRUDecoder, self).__init__()
         # parameters
         self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.n_layer = num_layers
+        self.src_hidden_size = src_hidden_size
+        self.trg_hidden_size = trg_hidden_size
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
         self.coverage = coverage
@@ -287,34 +290,35 @@ class GRUDecoder(torch.nn.Module):
         self.attn_decoder = attn_decoder
         
         self.gru_ = torch.nn.GRUCell(
-            self.input_size+self.hidden_size, 
-            self.hidden_size).cuda()
+            self.input_size+self.trg_hidden_size, 
+            self.trg_hidden_size).cuda()
         self.encoder_attn_layer = AttentionEncoder(
-            hidden_size=self.hidden_size,
+            src_hidden_size=self.src_hidden_size,
+            trg_hidden_size=self.trg_hidden_size,
             attn_method=self.attn_method,
             coverage=self.coverage).cuda()
         # intra-decoder
         if self.attn_decoder:
             self.decoder_attn_layer = AttentionDecoder(
-                hidden_size=self.hidden_size,
+                hidden_size=self.trg_hidden_size,
                 attn_method=self.attn_method).cuda()
             self.attn_out = torch.nn.Linear(
-                self.hidden_size*3,
-                self.hidden_size,
+                self.src_hidden_size + self.trg_hidden_size*2,
+                self.trg_hidden_size,
                 bias=True).cuda()
         else:
             self.attn_out = torch.nn.Linear(
-                self.hidden_size*2,
-                self.hidden_size,
+                self.src_hidden_size + self.trg_hidden_size,
+                self.trg_hidden_size,
                 bias=True).cuda()
         # pointer generator network
         if self.pointer_net:
             if self.attn_decoder:   
                 self.pt_out = torch.nn.Linear(
-                    self.input_size+self.hidden_size*3, 1).cuda()
+                    self.input_size+self.src_hidden_size + self.trg_hidden_size*2, 1).cuda()
             else:
                 self.pt_out = torch.nn.Linear(
-                    self.input_size+self.hidden_size*2, 1).cuda()
+                    self.input_size+self.src_hidden_size + self.trg_hidden_size, 1).cuda()
             
     def forward(
         self, idx, input_, hidden_, h_attn, 
@@ -339,7 +343,7 @@ class GRUDecoder(torch.nn.Module):
             if self.attn_decoder:
                 if k + idx == 0:
                     c_decoder = Variable(torch.zeros(
-                        batch_size, self.hidden_size)).cuda()
+                        batch_size, self.trg_hidden_size)).cuda()
                 else:
                     c_decoder, attn_de = self.decoder_attn_layer(
                         hidden_, past_dehy)
@@ -349,9 +353,9 @@ class GRUDecoder(torch.nn.Module):
                     past_dehy = hidden_.unsqueeze(0) # seqL*batch*hidden
                     past_dehy = past_dehy.transpose(0, 1) # batch*seqL*hidden
                 else:
-                    past_dehy = past_dehy.contiguous().view(-1, self.hidden_size) # seqL*batch**hidden
+                    past_dehy = past_dehy.contiguous().view(-1, self.trg_hidden_size) # seqL*batch**hidden
                     past_dehy = torch.cat((past_dehy, hidden_), 0) # (seqL+1)*batch**hidden
-                    past_dehy = past_dehy.view(de_idx+1, batch_size, self.hidden_size) # (seqL+1)*batch*hidden
+                    past_dehy = past_dehy.view(de_idx+1, batch_size, self.trg_hidden_size) # (seqL+1)*batch*hidden
                     past_dehy = past_dehy.transpose(0, 1) # batch*(seqL+1)*hidden
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_), 1))
             else:
@@ -470,8 +474,8 @@ class Seq2Seq(torch.nn.Module):
             # decoder
             self.decoder = LSTMDecoder(
                 input_size=self.trg_emb_dim,
-                hidden_size=self.trg_hidden_dim,
-                num_layers=self.trg_nlayer,
+                src_hidden_size=self.src_hidden_dim*self.src_num_directions,
+                trg_hidden_size=self.trg_hidden_dim,
                 attn_method=self.attn_method,
                 coverage=self.coverage,
                 batch_first=self.batch_first,
@@ -490,8 +494,8 @@ class Seq2Seq(torch.nn.Module):
             # decoder
             self.decoder = GRUDecoder(
                 input_size=self.trg_emb_dim,
-                hidden_size=self.trg_hidden_dim,
-                num_layers=self.trg_nlayer,
+                src_hidden_size=self.src_hidden_dim*self.src_num_directions,
+                trg_hidden_size=self.trg_hidden_dim,
                 attn_method=self.attn_method,
                 coverage=self.coverage,
                 batch_first=self.batch_first,
@@ -502,6 +506,10 @@ class Seq2Seq(torch.nn.Module):
         self.encoder2decoder = torch.nn.Linear(
             self.src_hidden_dim*self.src_num_directions,
             self.trg_hidden_dim).cuda()
+        if not self.src_hidden_dim == self.trg_hidden_dim:
+            self.encoder2decoder_c = torch.nn.Linear(
+                self.src_hidden_dim*self.src_num_directions,
+                self.trg_hidden_dim).cuda()
         # decoder to vocab
         if self.share_emb_weight:
             self.decoder2proj = torch.nn.Linear(
@@ -567,7 +575,10 @@ class Seq2Seq(torch.nn.Module):
                         
             decoder_h0 = self.encoder2decoder(h_t)
             decoder_h0 = F.tanh(decoder_h0)
-            decoder_c0 = c_t
+            if not self.src_hidden_dim == self.trg_hidden_dim:
+                decoder_c0 = self.encoder2decoder_c(c_t)
+            else:
+                decoder_c0 = c_t
             # decoder
             trg_h, (_, _), _, attn_, _, p_gen, _, loss_cv = self.decoder(
                 0, trg_emb,
@@ -649,8 +660,11 @@ class Seq2Seq(torch.nn.Module):
                         
             decoder_h0 = self.encoder2decoder(h_t)
             decoder_h0 = F.tanh(decoder_h0)
-            decoder_c0 = c_t
-                    
+            if not self.src_hidden_dim == self.trg_hidden_dim:
+                decoder_c0 = self.encoder2decoder_c(c_t)
+            else:
+                decoder_c0 = c_t
+                
             return encoder_hy, (decoder_h0, decoder_c0), h_attn, past_attn, past_dehy
         
         elif self.network_ == 'gru':
