@@ -28,7 +28,7 @@ parser.add_argument('--src_seq_lens', type=int, default=400, help='length of sou
 parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
 parser.add_argument('--src_emb_dim', type=int, default=128, help='source embedding dimension')
 parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embedding dimension')
-parser.add_argument('--src_hidden_dim', type=int, default=400, help='encoder hidden dimension')
+parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
 parser.add_argument('--trg_hidden_dim', type=int, default=256, help='decoder hidden dimension')
 parser.add_argument('--src_num_layers', type=int, default=1, help='encoder number layers')
 parser.add_argument('--vocab_size', type=int, default=50000, help='max number of words in the vocabulary.')
