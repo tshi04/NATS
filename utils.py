@@ -150,3 +150,9 @@ def fast_beam_search(
         
         torch.cuda.empty_cache()
     return beam_seq, beam_prb, beam_attn_
+
+def show_progress(a, b):
+    cc = int(round(100.0*float(a)/float(b)))
+    dstr = '[' + '>'*cc + ' '*(100-cc) + ']'
+    sys.stdout.write(dstr + str(cc) + '%' +'\r')
+    sys.stdout.flush()

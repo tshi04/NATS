@@ -350,7 +350,7 @@ if opt.task == 'validate':
                 
                 losses.append(loss.data.cpu().numpy())
                 if batch_id%10 == 0:
-                    print(batch_id, end=' ')
+                    show_progress(batch_id+1, args.val_num_batch)
                 del logits, attn_, p_gen, loss_cv, loss
             print()
             losses = np.array(losses)
