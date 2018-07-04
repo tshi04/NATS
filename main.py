@@ -349,8 +349,7 @@ if opt.task == 'validate':
                         trg_output_var.view(-1))
                 
                 losses.append(loss.data.cpu().numpy())
-                if batch_id%10 == 0:
-                    show_progress(batch_id+1, args.val_num_batch)
+                show_progress(batch_id+1, opt.val_num_batch)
                 del logits, attn_, p_gen, loss_cv, loss
             print()
             losses = np.array(losses)
