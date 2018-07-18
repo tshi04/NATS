@@ -53,3 +53,4 @@ concat + temporal + attn_decoder
 ```
 - We have tried to optimize the memory usage, but we are still not quite happy with it.
 - Merge the LSTM and GRU decoders.
+- textsum has been written from the scratches. If you find any bug, please contact Tian by tshi at vt dot edu.
