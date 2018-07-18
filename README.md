@@ -1,7 +1,6 @@
 # Text summarization
 
-- Neural Abstractive Summarization with Sequence-to-Sequence models
-- Bug report tshi at vt dot edu.
+- Neural Abstractive Summarization with Sequence-to-Sequence Models
 - Previous version with python2.7 can be found [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7). 
 
 ## Requirements
