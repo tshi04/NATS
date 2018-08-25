@@ -249,6 +249,8 @@ if opt.task == 'train':
             if opt.debug:
                 break
             del logits, attn_, p_gen, loss_cv, loss
+            if batch_id%opt.checkpoint == 0:
+                torch.cuda.empty_cache()
         if opt.debug:
             break
         
