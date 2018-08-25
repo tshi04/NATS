@@ -248,8 +248,8 @@ if opt.task == 'train':
                 print(' '.join(sen_pred))
             if opt.debug:
                 break
-            del logits, attn_, p_gen, loss_cv, loss
-            if batch_id%opt.checkpoint == 0:
+            if batch_id%20 == 0:
+                del logits, attn_, p_gen, loss_cv, loss
                 torch.cuda.empty_cache()
         if opt.debug:
             break
