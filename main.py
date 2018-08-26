@@ -248,9 +248,9 @@ if opt.task == 'train':
                 print(' '.join(sen_pred))
             if opt.debug:
                 break
-            if batch_id%20 == 0:
-                del logits, attn_, p_gen, loss_cv, loss
-                torch.cuda.empty_cache()
+            del logits, attn_, p_gen, loss_cv, loss
+            # still have problem after adding this line.
+            #torch.cuda.empty_cache()
         if opt.debug:
             break
         
@@ -388,7 +388,7 @@ if opt.task == 'beam':
     )
     print('The number of batches (test): {}'.format(test_batch))
 
-    torch.eval()
+    model.eval()
     with torch.no_grad():
         model.load_state_dict(torch.load(
             os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
