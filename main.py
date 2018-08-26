@@ -22,7 +22,7 @@ parser.add_argument('--task', default='train', help='train | validate | rouge | 
 parser.add_argument('--data_dir', default='../sum_data/', help='directory that store the data.')
 parser.add_argument('--file_vocab', default='vocab', help='file store training vocabulary.')
 parser.add_argument('--file_corpus', default='train.txt', help='file store training documents.')
-parser.add_argument('--n_epoch', type=int, default=35, help='number of epochs.')
+parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs.')
 parser.add_argument('--batch_size', type=int, default=16, help='batch size.')
 parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
 parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
@@ -61,7 +61,7 @@ parser.add_argument('--beam_size', type=int, default=5, help='beam size.')
 
 parser.add_argument('--copy_words', type=bool, default=True, help='Do you want to copy words?')
 parser.add_argument('--model_dir', default='seq2seq_results-0', help='directory that store the model.')
-parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.')
+parser.add_argument('--model_file', default='seq2seq_0_0.model', help='file for model.')
 
 opt = parser.parse_args()
 
@@ -391,7 +391,7 @@ if opt.task == 'beam':
     model.eval()
     with torch.no_grad():
         model.load_state_dict(torch.load(
-            os.path.join(opt.data_dir, opt.model_dir, opt.model_file+'.model')))
+            os.path.join(opt.data_dir, opt.model_dir, opt.model_file)))
 
         start_time = time.time()
         if opt.oov_explicit:
