@@ -355,7 +355,8 @@ if opt.task == 'validate':
                     losses.append(loss.data.cpu().numpy())
                     show_progress(batch_id+1, opt.val_num_batch)
                     del logits, attn_, p_gen, loss_cv, loss
-                    torch.cuda.empty_cache()
+                    # it does not work fine after adding this line
+                    #torch.cuda.empty_cache()
                 print()
                 losses = np.array(losses)
                 end_time = time.time()
