@@ -52,7 +52,8 @@ parser.add_argument('--learning_rate', type=float, default=0.0001, help='learnin
 parser.add_argument('--grad_clip', type=float, default=2.0, help='clip the gradient norm.')
 parser.add_argument('--checkpoint', type=int, default=200, help='How often you want to save model?')
 parser.add_argument('--nbestmodel', type=int, default=20, help='How many models you want to keep?')
-parser.add_argument('--val_num_batch', type=int, default=100, help='how many batches')
+parser.add_argument('--val_num_batch', type=int, default=10, help='how many batches')
+parser.add_argument('--use_move_avg', type=bool, default=True, help='move average')
 parser.add_argument('--continue_training', type=bool, default=True, help='Do you want to continue?')
 parser.add_argument('--debug', type=bool, default=False, help='if true will clean the output after training')
 parser.add_argument('--file_test', default='test.txt', help='test data')
@@ -277,7 +278,13 @@ if opt.task == 'validate':
     while 1:
         model_para_files = []
         model_para_files = glob.glob(os.path.join(opt.data_dir, opt.model_dir, '*.model'))
+        for j in range(len(model_para_files)):
+            arr = re.split('\_|\.', model_para_files[j])
+            arr = [int(arr[-3]), int(arr[-2]), model_para_files[j]]
+            model_para_files[j] = arr
         model_para_files = sorted(model_para_files)[::-1]
+        for j in range(len(model_para_files)):
+            model_para_files[j] = model_para_files[j][-1]
         
         for fl_ in model_para_files:           
             best_model = {itm[0]: itm[1] for itm in best_arr}
@@ -286,7 +293,7 @@ if opt.task == 'validate':
             losses = []
             start_time = time.time()
             if os.path.exists(fl_):
-                time.sleep(10)
+                time.sleep(3)
                 model.load_state_dict(torch.load(fl_))
             else:
                 continue
@@ -355,7 +362,14 @@ if opt.task == 'validate':
             print()
             losses = np.array(losses)
             end_time = time.time()
-            best_arr.append([fl_, np.average(losses), end_time-start_time])
+            if opt.use_move_avg:
+                try:
+                    losses_out = 0.9*losses_out + 0.1*np.average(losses)
+                except:
+                    losses_out = np.average(losses)
+            else:
+                losses_out = np.average(losses)
+            best_arr.append([fl_, losses_out, end_time-start_time])
             for itm in best_arr[:opt.nbestmodel]:
                 print('model={}, loss={}, time={}'.format(itm[0], itm[1], itm[2]))
             
