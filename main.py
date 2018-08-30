@@ -282,7 +282,7 @@ if opt.task == 'validate':
             arr = re.split('\_|\.', model_para_files[j])
             arr = [int(arr[-3]), int(arr[-2]), model_para_files[j]]
             model_para_files[j] = arr
-        model_para_files = sorted(model_para_files)[::-1]
+        model_para_files = sorted(model_para_files)
         for j in range(len(model_para_files)):
             model_para_files[j] = model_para_files[j][-1]
         
