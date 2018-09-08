@@ -25,7 +25,7 @@ parser.add_argument('--file_corpus', default='train.txt', help='file store train
 parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs.')
 parser.add_argument('--batch_size', type=int, default=16, help='batch size.')
 parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
-parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
+parser.add_argument('--trg_seq_lens', type=int, default=50, help='length of trage documents.')
 parser.add_argument('--src_emb_dim', type=int, default=128, help='source embedding dimension')
 parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embedding dimension')
 parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
@@ -44,8 +44,8 @@ parser.add_argument('--attn_method', default='luong_general', help='luong_dot | 
 parser.add_argument('--coverage', default='temporal', help='vanilla | temporal | asee')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=bool, default=True, help='Use pointer network?')
-parser.add_argument('--attn_decoder', type=bool, default=True, help='attention decoder?')
-parser.add_argument('--oov_explicit', type=bool, default=True, help='explicit OOV?')
+parser.add_argument('--attn_decoder', type=bool, default=False, help='attention decoder?')
+parser.add_argument('--oov_explicit', type=bool, default=False, help='explicit OOV?')
 parser.add_argument('--share_emb_weight', type=bool, default=True, help='share_emb_weight')
 
 parser.add_argument('--learning_rate', type=float, default=0.0001, help='learning rate.')
@@ -80,20 +80,19 @@ if opt.oov_explicit:
 if not opt.task == 'train':
     opt.dropout = 0.0
     
-vocab2id, id2vocab = construct_vocab(
-    file_=opt.data_dir+'/'+opt.file_vocab,
-    max_size=opt.vocab_size,
-    mincount=opt.word_mincount
-)
-print('The vocabulary size: {}'.format(len(vocab2id)))
-src_vocab2id = vocab2id
-src_id2vocab = id2vocab
+if not opt.task == 'rouge':
+    vocab2id, id2vocab = construct_vocab(
+        file_=opt.data_dir+'/'+opt.file_vocab,
+        max_size=opt.vocab_size,
+        mincount=opt.word_mincount)
+    print('The vocabulary size: {}'.format(len(vocab2id)))
+    src_vocab2id = vocab2id
+    src_id2vocab = id2vocab
 if not opt.shared_embedding:
     src_vocab2id, src_id2vocab = construct_vocab(
         file_=opt.data_dir+'/'+opt.file_vocab,
         max_size=opt.src_vocab_size,
-        mincount=opt.src_word_mincount
-    )
+        mincount=opt.src_word_mincount)
     print('The vocabulary size: {}'.format(len(src_vocab2id)))
 
 if opt.task == 'train' or opt.task == 'validate' or opt.task == 'beam':
