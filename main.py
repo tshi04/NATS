@@ -25,7 +25,7 @@ parser.add_argument('--file_corpus', default='train.txt', help='file store train
 parser.add_argument('--n_epoch', type=int, default=20, help='number of epochs.')
 parser.add_argument('--batch_size', type=int, default=16, help='batch size.')
 parser.add_argument('--src_seq_lens', type=int, default=400, help='length of source documents.')
-parser.add_argument('--trg_seq_lens', type=int, default=50, help='length of trage documents.')
+parser.add_argument('--trg_seq_lens', type=int, default=100, help='length of trage documents.')
 parser.add_argument('--src_emb_dim', type=int, default=128, help='source embedding dimension')
 parser.add_argument('--trg_emb_dim', type=int, default=128, help='target embedding dimension')
 parser.add_argument('--src_hidden_dim', type=int, default=256, help='encoder hidden dimension')
