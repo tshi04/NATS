@@ -41,7 +41,7 @@ parser.add_argument('--shared_embedding', type=str2bool, default=True, help='sou
 parser.add_argument('--dropout', type=float, default=0.0, help='dropout')
 
 parser.add_argument('--attn_method', default='luong_concat', help='luong_dot | luong_concat | luong_general')
-parser.add_argument('--coverage', default='vanilla', help='vanilla | temporal | asee')
+parser.add_argument('--repetition', default='vanilla', help='vanilla | temporal | asee (coverage). Repetition Handling')
 parser.add_argument('--network_', default='lstm', help='gru | lstm')
 parser.add_argument('--pointer_net', type=str2bool, default=True, help='Use pointer network?')
 parser.add_argument('--attn_decoder', type=str2bool, default=True, help='attention decoder?')
@@ -68,12 +68,12 @@ parser.add_argument('--model_file', default='seq2seq_0_0', help='file for model.
 
 args = parser.parse_args()
 
-if args.coverage == 'asee' and args.task == 'train':
-    args.coverage = 'asee_train'
+if args.repetition == 'asee' and args.task == 'train':
+    args.repetition = 'asee_train'
 if args.pointer_net:
     args.shared_embedding = True
 else:
-    args.coverage = 'vanilla'
+    args.repetition = 'vanilla'
     args.oov_explicit = False
 if args.oov_explicit:
     args.shared_embedding = True
@@ -109,7 +109,7 @@ if args.task == 'train' or args.task == 'validate' or args.task == 'beam':
         src_bidirect=args.src_bidirection,
         dropout=args.dropout,
         attn_method=args.attn_method,
-        coverage=args.coverage,
+        repetition=args.repetition,
         network_=args.network_,
         pointer_net=args.pointer_net,
         shared_emb=args.shared_embedding,
@@ -214,7 +214,7 @@ if args.task == 'train':
                     logits.contiguous().view(-1, len(vocab2id)),
                     trg_output_var.view(-1))
 
-            if args.coverage == 'asee_train':
+            if args.repetition == 'asee_train':
                 loss = loss + loss_cv[0]
             
             optimizer.zero_grad()

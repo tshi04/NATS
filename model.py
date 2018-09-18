@@ -26,13 +26,13 @@ class AttentionEncoder(torch.nn.Module):
         src_hidden_size,
         trg_hidden_size,
         attn_method,
-        coverage,
+        repetition,
     ):
         super(AttentionEncoder, self).__init__()
         self.method = attn_method.lower()
         self.src_hidden_size = src_hidden_size
         self.trg_hidden_size = trg_hidden_size
-        self.coverage = coverage
+        self.repetition = repetition
         
         if self.method == 'luong_concat':
             self.attn_en_in = torch.nn.Linear(
@@ -55,7 +55,7 @@ class AttentionEncoder(torch.nn.Module):
         # attention score
         if self.method == 'luong_concat':
             attn_agg = self.attn_en_in(enhy) + self.attn_de_in(dehy.unsqueeze(1))
-            if self.coverage[:4] == 'asee':
+            if self.repetition[:4] == 'asee':
                 attn_agg = attn_agg + self.attn_cv_in(past_attn.unsqueeze(2))
             attn_agg = F.tanh(attn_agg)
             attn_ee = self.attn_warp_in(attn_agg).squeeze(2)
@@ -65,8 +65,8 @@ class AttentionEncoder(torch.nn.Module):
                 attn_ee = torch.bmm(enhy_new, dehy.unsqueeze(2)).squeeze(2)
             else:
                 attn_ee = torch.bmm(enhy, dehy.unsqueeze(2)).squeeze(2)
-        # coverage and attention weights
-        if self.coverage == 'temporal':
+        # repetition and attention weights
+        if self.repetition == 'temporal':
             attn_ee = torch.exp(attn_ee)
             attn = attn_ee/past_attn
             nm = torch.norm(attn, 1, 1).unsqueeze(1)
@@ -140,7 +140,7 @@ class LSTMDecoder(torch.nn.Module):
         src_hidden_size,
         trg_hidden_size,
         attn_method,
-        coverage,
+        repetition,
         batch_first,
         pointer_net,
         attn_decoder
@@ -152,7 +152,7 @@ class LSTMDecoder(torch.nn.Module):
         self.trg_hidden_size = trg_hidden_size
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
-        self.coverage = coverage
+        self.repetition = repetition
         self.pointer_net = pointer_net
         self.attn_decoder = attn_decoder
         
@@ -163,7 +163,7 @@ class LSTMDecoder(torch.nn.Module):
             src_hidden_size=self.src_hidden_size,
             trg_hidden_size=self.trg_hidden_size,
             attn_method=self.attn_method, 
-            coverage=self.coverage).cuda()
+            repetition=self.repetition).cuda()
         # intra-decoder
         if self.attn_decoder:           
             self.decoder_attn_layer = AttentionDecoder(
@@ -227,17 +227,17 @@ class LSTMDecoder(torch.nn.Module):
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_[0]), 1))
             else:
                 h_attn = self.attn_out(torch.cat((c_encoder, hidden_[0]), 1))
-            # coverage
-            if self.coverage == 'asee_train':
+            # repetition
+            if self.repetition == 'asee_train':
                 lscv = torch.cat((past_attn.unsqueeze(2), attn.unsqueeze(2)), 2)
                 lscv = lscv.min(dim=2)[0]
                 try:
                     loss_cv = loss_cv + torch.mean(lscv)
                 except:
                     loss_cv = torch.mean(lscv)
-            if self.coverage[:4] == 'asee':
+            if self.repetition[:4] == 'asee':
                 past_attn = past_attn + attn
-            if self.coverage == 'temporal':
+            if self.repetition == 'temporal':
                 if k + idx == 0:
                     past_attn = past_attn*0.0
                 past_attn = past_attn + attn_ee
@@ -273,7 +273,7 @@ class GRUDecoder(torch.nn.Module):
         src_hidden_size,
         trg_hidden_size,
         attn_method,
-        coverage,
+        repetition,
         batch_first,
         pointer_net,
         attn_decoder
@@ -285,7 +285,7 @@ class GRUDecoder(torch.nn.Module):
         self.trg_hidden_size = trg_hidden_size
         self.batch_first = batch_first
         self.attn_method = attn_method.lower()
-        self.coverage = coverage
+        self.repetition = repetition
         self.pointer_net = pointer_net
         self.attn_decoder = attn_decoder
         
@@ -296,7 +296,7 @@ class GRUDecoder(torch.nn.Module):
             src_hidden_size=self.src_hidden_size,
             trg_hidden_size=self.trg_hidden_size,
             attn_method=self.attn_method,
-            coverage=self.coverage).cuda()
+            repetition=self.repetition).cuda()
         # intra-decoder
         if self.attn_decoder:
             self.decoder_attn_layer = AttentionDecoder(
@@ -360,17 +360,17 @@ class GRUDecoder(torch.nn.Module):
                 h_attn = self.attn_out(torch.cat((c_encoder, c_decoder, hidden_), 1))
             else:
                 h_attn = self.attn_out(torch.cat((c_encoder, hidden_), 1))
-            # coverage
-            if self.coverage == 'asee_train':
+            # repetition
+            if self.repetition == 'asee_train':
                 lscv = torch.cat((past_attn.unsqueeze(2), attn.unsqueeze(2)), 2)
                 lscv = lscv.min(dim=2)[0]
                 try:
                     loss_cv = loss_cv + torch.mean(lscv)
                 except:
                     loss_cv = torch.mean(lscv)
-            if self.coverage[:4] == 'asee':
+            if self.repetition[:4] == 'asee':
                 past_attn = past_attn + attn
-            if self.coverage == 'temporal':
+            if self.repetition == 'temporal':
                 if k + idx == 0:
                     past_attn = past_attn*0.0
                 past_attn = past_attn + attn_ee
@@ -414,7 +414,7 @@ class Seq2Seq(torch.nn.Module):
         src_bidirect=True,
         dropout=0.0,
         attn_method='vanilla',
-        coverage='vanilla',
+        repetition='vanilla',
         network_='lstm',
         pointer_net=False,
         shared_emb=True,
@@ -435,7 +435,7 @@ class Seq2Seq(torch.nn.Module):
         self.src_bidirect = src_bidirect
         self.dropout = dropout
         self.attn_method = attn_method.lower()
-        self.coverage = coverage.lower()
+        self.repetition = repetition.lower()
         self.network_ = network_.lower()
         self.pointer_net = pointer_net
         self.shared_emb = shared_emb
@@ -477,7 +477,7 @@ class Seq2Seq(torch.nn.Module):
                 src_hidden_size=self.src_hidden_dim*self.src_num_directions,
                 trg_hidden_size=self.trg_hidden_dim,
                 attn_method=self.attn_method,
-                coverage=self.coverage,
+                repetition=self.repetition,
                 batch_first=self.batch_first,
                 pointer_net=self.pointer_net,
                 attn_decoder=self.attn_decoder
@@ -497,7 +497,7 @@ class Seq2Seq(torch.nn.Module):
                 src_hidden_size=self.src_hidden_dim*self.src_num_directions,
                 trg_hidden_size=self.trg_hidden_dim,
                 attn_method=self.attn_method,
-                coverage=self.coverage,
+                repetition=self.repetition,
                 batch_first=self.batch_first,
                 pointer_net=self.pointer_net,
                 attn_decoder=self.attn_decoder
@@ -546,7 +546,7 @@ class Seq2Seq(torch.nn.Module):
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
-        if self.coverage == 'temporal':
+        if self.repetition == 'temporal':
             past_attn = Variable(torch.ones(
                 batch_size, src_seq_len)).cuda()
         else:
@@ -632,7 +632,7 @@ class Seq2Seq(torch.nn.Module):
         h0_encoder = Variable(torch.zeros(
             self.encoder.num_layers*self.src_num_directions,
             batch_size, self.src_hidden_dim)).cuda()
-        if self.coverage == 'temporal':
+        if self.repetition == 'temporal':
             past_attn = Variable(torch.ones(
                 batch_size, src_seq_len)).cuda()
         else:
