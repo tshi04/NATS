@@ -13,8 +13,7 @@
 - pytorch 0.4.0
 
 Use following scripts to setup
-- [Tesla K80](https://github.com/tshi04/textsum/tree/master/tools/config_server)
-- [Tesla V100](https://github.com/tshi04/SetEC2)
+- [Set up server](https://github.com/tshi04/AbsSum/tree/master/tools/config_server)
 - [pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum/tree/master/tools/rouge_package)
 
 ## Usuage
