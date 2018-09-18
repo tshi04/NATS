@@ -1,7 +1,8 @@
 # Text summarization
 
+- This is a Pytorch implementation of the seq2seq models for abstractive summarization.
+- Previous version with python2.7 can be found [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7). It has not been maintained for a while.
 - Neural Abstractive Summarization with Sequence-to-Sequence Models
-- Previous version with python2.7 can be found [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7). 
 
 ## Requirements
 
@@ -23,8 +24,6 @@ Use following scripts to setup
 - [CNN/Daily Mail](https://github.com/abisee/pointer-generator)
 - [newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
 
-Note: Please set bool type parameters in the main.py file.
-
 #### Training
 ```
 python main.py 
@@ -45,7 +44,7 @@ run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
 
 ## Problems and Todos
 
-- The following combinations failed during the training after several epochs.
+- Some models failed during the training after several epochs. For example, on CNN/Daily Mail dataset,
 ```
 concat + temporal
 concat + temporal + attn_decoder
