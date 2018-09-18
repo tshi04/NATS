@@ -152,8 +152,16 @@ def fast_beam_search(
         torch.cuda.empty_cache()
     return beam_seq, beam_prb, beam_attn_
 
-def show_progress(a, b):
+def show_progress(a, b, time=""):
     cc = int(round(100.0*float(a)/float(b)))
     dstr = '[' + '>'*cc + ' '*(100-cc) + ']'
-    sys.stdout.write(dstr + str(cc) + '%' +'\r')
+    sys.stdout.write(dstr + str(cc) + '%' + time +'\r')
     sys.stdout.flush()
+    
+def str2bool(input_):
+    if input_.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif input_.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
