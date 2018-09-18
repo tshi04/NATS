@@ -1,8 +1,8 @@
-# Text summarization
+# Abstractive Text Summarization
 
 - This is a Pytorch implementation of the seq2seq models for abstractive summarization.
 - Previous version with python2.7 can be found [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7). It has not been maintained for a while.
-- Neural Abstractive Summarization with Sequence-to-Sequence Models
+- Neural Abstractive Summarization with Sequence-to-Sequence Models.
 
 ## Requirements
 
@@ -30,16 +30,15 @@ python main.py
 ```
 #### Validate
 ```
-python main.py --task validate --batch_size 10
+python main.py --task validate
 ```
 #### Test
 ```
-python main.py --task beam --batch_size 4
+python main.py --task beam
 ```
 #### Rouge
 ```
 python main.py --task rouge
-run cal_rouge.ipynb to calculate the rouge score using pyrouge and ROUGE-1.5.5
 ```
 
 ## Problems and Todos
@@ -51,4 +50,4 @@ concat + temporal + attn_decoder
 ```
 - We have tried to optimize the memory usage, but we are still not quite happy with it.
 - Merge the LSTM and GRU decoders.
-- textsum has been written from the scratches. If you find any bug, please contact Tian by tshi at vt dot edu.
+- AbsSum has been written from the scratches. If you find any bug, please contact Tian by tshi at vt dot edu.
