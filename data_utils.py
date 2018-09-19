@@ -51,7 +51,7 @@ def create_batch_file(path_, fkey_, file_, batch_size):
     corpus_arr = []
     fp = open(file_name, 'r')
     for line in fp:
-        corpus_arr.append(line)
+        corpus_arr.append(line.lower())
     fp.close()
     if fkey_ == 'train' or fkey_== 'validate':
         random.shuffle(corpus_arr)
