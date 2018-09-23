@@ -527,6 +527,7 @@ if args.task == 'beam':
             end_time = time.time()
             show_progress(batch_id, test_batch, str((end_time-start_time)/3600)[:8]+"h")
         fout.close()
+    print()
 '''
 rouge
 '''
