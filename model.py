@@ -506,7 +506,7 @@ class Seq2Seq(torch.nn.Module):
         self.encoder2decoder = torch.nn.Linear(
             self.src_hidden_dim*self.src_num_directions,
             self.trg_hidden_dim).cuda()
-        if not self.src_hidden_dim == self.trg_hidden_dim:
+        if not self.src_hidden_dim*self.src_hidden_dim == self.trg_hidden_dim:
             self.encoder2decoder_c = torch.nn.Linear(
                 self.src_hidden_dim*self.src_num_directions,
                 self.trg_hidden_dim).cuda()
@@ -575,7 +575,7 @@ class Seq2Seq(torch.nn.Module):
                         
             decoder_h0 = self.encoder2decoder(h_t)
             decoder_h0 = F.tanh(decoder_h0)
-            if not self.src_hidden_dim == self.trg_hidden_dim:
+            if not self.src_hidden_dim*self.src_hidden_dim == self.trg_hidden_dim:
                 decoder_c0 = self.encoder2decoder_c(c_t)
             else:
                 decoder_c0 = c_t
@@ -660,7 +660,7 @@ class Seq2Seq(torch.nn.Module):
                         
             decoder_h0 = self.encoder2decoder(h_t)
             decoder_h0 = F.tanh(decoder_h0)
-            if not self.src_hidden_dim == self.trg_hidden_dim:
+            if not self.src_hidden_dim*self.src_hidden_dim == self.trg_hidden_dim:
                 decoder_c0 = self.encoder2decoder_c(c_t)
             else:
                 decoder_c0 = c_t
