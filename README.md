@@ -1,16 +1,11 @@
 # Abstractive Text Summarization
 
 
-.. image:: https://img.shields.io/badge/Made%20with-Python-1f425f.svg
-      :target: https://www.python.org/
-.. image:: https://img.shields.io/pypi/l/ansicolortags.svg
-      :target: https://github.com/tshi04/AbsSum/blob/master/LICENSE
-.. image:: https://img.shields.io/github/contributors/Naereen/StrapDown.js.svg
-      :target: https://github.com/tshi04/AbsSum/graphs/contributors
-.. image:: https://img.shields.io/github/issues/Naereen/StrapDown.js.svg
-      :target: https://github.com/tshi04/AbsSum/issues
-.. image:: https://img.shields.io/badge/arXiv-1805.09461-red.svg?style=flat
-   :target: https://github.com/tshi04/AbsSum
+[![image](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
+[![image](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/tshi04/AbsSum/blob/master/LICENSE)
+[![image](https://img.shields.io/github/contributors/Naereen/StrapDown.js.svg)](https://github.com/tshi04/AbsSum/graphs/contributors)
+[![image](https://img.shields.io/github/issues/Naereen/StrapDown.js.svg)](https://github.com/tshi04/AbsSum/issues)
+[![image](https://img.shields.io/badge/arXiv-1805.09461-red.svg?style=flat)](https://github.com/tshi04/AbsSum)
 
 - This is a Pytorch implementation of the seq2seq models for abstractive summarization.
 - Previous version with python2.7 can be found [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7). It has not been maintained for a while.
