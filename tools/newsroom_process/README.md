@@ -18,18 +18,13 @@ Following the instructions, we can scrape and extract the dataset.
 
 #### Get plain texts
 
-We can use different packages to tokenize the texts. If you are using Stanford CoreNLP
-```
-python3 extract_corenlp.py
-```
-using spacy
-```
-python3 extract_spacy.py
-```
-using nltk
-```
-python3 extract_nltk.py
-```
+We can use different packages to tokenize the texts. If you are using 
+- ```Stanford CoreNLP``` python3 extract_corenlp.py
+
+- ```spacy``` python3 extract_spacy.py
+
+- ```nltk``` python3 extract_nltk.py
+
 
 #### Create data and vocabulary
 
