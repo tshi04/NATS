@@ -28,6 +28,7 @@
 
 - [CNN/Daily Mail](https://github.com/abisee/pointer-generator)
 - [Newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
+- [Bytecup2018](https://github.com/tshi04/AbsSum/tree/master/tools/bytecup_process)
 
 ## Usuage
 
