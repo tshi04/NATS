@@ -1,5 +1,4 @@
-# Abstractive Text Summarization
-
+# AbsSum
 
 [![image](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
 [![image](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/tshi04/AbsSum/blob/master/LICENSE)
@@ -7,11 +6,12 @@
 [![image](https://img.shields.io/github/issues/Naereen/StrapDown.js.svg)](https://github.com/tshi04/AbsSum/issues)
 [![image](https://img.shields.io/badge/arXiv-1805.09461-red.svg?style=flat)](https://github.com/tshi04/AbsSum)
 
-- This is a Pytorch implementation of the seq2seq models for abstractive summarization.
-- Previous version with python2.7 can be found [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7). It has not been maintained for a while.
-- Neural Abstractive Summarization with Sequence-to-Sequence Models.
+- Check python2.7 version of AbsSum from [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7).
+- This repository is a pytorch implementation of seq2seq models for the following [survey](https://github.com/tshi04/AbsSum):
 
-## Requirements
+```Neural Abstractive Summarization with Sequence-to-Sequence Models```
+
+## Requirements and Installation
 
 - Python 3.5.2
 - glob
@@ -19,33 +19,50 @@
 - shutil
 - pytorch 0.4.0
 
-Use following scripts to setup
-- [Set up server](https://github.com/tshi04/AbsSum/tree/master/tools/config_server)
-- [pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum/tree/master/tools/rouge_package)
+**Use following scripts to**
+
+- [Set up GPU, cuda and pytorch](https://github.com/tshi04/AbsSum/tree/master/tools/config_server)
+- [Install pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum/tree/master/tools/rouge_package)
+
+## Dataset
+
+- [CNN/Daily Mail](https://github.com/abisee/pointer-generator)
+- [Newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
 
 ## Usuage
 
-#### Dataset
+- ```Training:``` python main.py 
 
-- [CNN/Daily Mail](https://github.com/abisee/pointer-generator)
-- [newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
+- ```Validate:``` python main.py --task validate
 
-#### Training
-```
-python main.py 
-```
-#### Validate
-```
-python main.py --task validate
-```
-#### Test
-```
-python main.py --task beam
-```
-#### Rouge
-```
-python main.py --task rouge
-```
+- ```Test:``` python main.py --task beam
+
+- ```Rouge:``` python main.py --task rouge
+
+
+## Features
+
+The AbsSum is equipped with following features:
+
+- ```Attention based seq2seq framework.``` 
+Encoder and decoder can be LSTM or GRU. The attention scores can be calculated with three different alignment methods.
+
+- ```Pointer-generator network.```
+
+- ```Intra-temporal attention mechanism and intra-decoder attention mechanism.```
+
+- ```Coverage mechanism.```
+
+- ```Weight sharing mechanism.```
+Weight sharing mechanism can boost the performance with significantly less parameters.
+
+- ```Beam search algorithm.```
+We implemented an efficient beam search algorithm that can also handle cases when batch_size>1.
+
+- ```Unknown words replacement.```
+This meta-algorithm can be used along with any attention based seq2seq model.
+The OOV words <unk> in summaries are manually replaced with words in source articles using attention weights.
+
 
 ## Problems and Todos
 
@@ -54,6 +71,12 @@ python main.py --task rouge
 concat + temporal
 concat + temporal + attn_decoder
 ```
-- We have tried to optimize the memory usage, but we are still not quite happy with it.
+- We have tried to optimize memory usage, but we are still not quite happy with it.
 - Merge the LSTM and GRU decoders.
-- AbsSum has been written from the scratches. If you find any bug, please contact Tian by tshi at vt dot edu.
+
+
+
+
+
+
+
