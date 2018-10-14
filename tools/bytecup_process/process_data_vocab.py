@@ -41,20 +41,17 @@ for fl in files_:
         show_progress(cnt, total_)
         arr = json.loads(line)
         if str(arr['id']) in train_id:
-            title = re.split('\s|<s>|</s>', arr['title'])
-            title = ' '.join(list(filter(None, title)))
+            title = arr['title']
             artile = re.split('\s|<s>|</s>', arr['content'])
             artile = ' '.join(list(filter(None, artile)))
             fout1.write('<sec>'.join([title, artile])+'\n')
         if str(arr['id']) in val_id:
-            title = re.split('\s|<s>|</s>', arr['title'])
-            title = ' '.join(list(filter(None, title)))
+            title = arr['title']
             artile = re.split('\s|<s>|</s>', arr['content'])
             artile = ' '.join(list(filter(None, artile)))
             fout2.write('<sec>'.join([title, artile])+'\n')
         if str(arr['id']) in test_id:
-            title = re.split('\s|<s>|</s>', arr['title'])
-            title = ' '.join(list(filter(None, title)))
+            title = arr['title']
             artile = re.split('\s|<s>|</s>', arr['content'])
             artile = ' '.join(list(filter(None, artile)))
             fout3.write('<sec>'.join([title, artile])+'\n')
