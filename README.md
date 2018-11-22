@@ -1,13 +1,13 @@
 # NATS toolkit
 
 [![image](https://img.shields.io/badge/Made%20with-Python-1f425f.svg)](https://www.python.org/)
-[![image](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/tshi04/AbsSum/blob/master/LICENSE)
-[![image](https://img.shields.io/github/contributors/Naereen/StrapDown.js.svg)](https://github.com/tshi04/AbsSum/graphs/contributors)
-[![image](https://img.shields.io/github/issues/Naereen/StrapDown.js.svg)](https://github.com/tshi04/AbsSum/issues)
-[![image](https://img.shields.io/badge/arXiv-1805.09461-red.svg?style=flat)](https://github.com/tshi04/AbsSum)
+[![image](https://img.shields.io/pypi/l/ansicolortags.svg)](https://github.com/tshi04/NATS/blob/master/LICENSE)
+[![image](https://img.shields.io/github/contributors/Naereen/StrapDown.js.svg)](https://github.com/tshi04/NATS/graphs/contributors)
+[![image](https://img.shields.io/github/issues/Naereen/StrapDown.js.svg)](https://github.com/tshi04/NATS/issues)
+[![image](https://img.shields.io/badge/arXiv-1805.09461-red.svg?style=flat)](https://github.com/tshi04/NATS)
 
-- Check python2.7 version of AbsSum from [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7).
-- This repository is a pytorch implementation of seq2seq models for the following [survey](https://github.com/tshi04/AbsSum):
+- Check python2.7 version of NATS from [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7).
+- This repository is a pytorch implementation of seq2seq models for the following [survey](https://github.com/tshi04/NATS):
 
 ```Neural Abstractive Summarization with Sequence-to-Sequence Models```
 
@@ -21,14 +21,14 @@
 
 **Use following scripts to**
 
-- [Set up GPU, cuda and pytorch](https://github.com/tshi04/AbsSum/tree/master/tools/config_server)
+- [Set up GPU, cuda and pytorch](https://github.com/tshi04/NATS/tree/master/tools/config_server)
 - [Install pyrouge and ROUGE-1.5.5](https://github.com/tshi04/textsum/tree/master/tools/rouge_package)
 
 ## Dataset
 
 - [CNN/Daily Mail](https://github.com/abisee/pointer-generator)
 - [Newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
-- [Bytecup2018](https://github.com/tshi04/AbsSum/tree/master/tools/bytecup_process)
+- [Bytecup2018](https://github.com/tshi04/NATS/tree/master/tools/bytecup_process)
 
 ## Usuage
 
@@ -43,7 +43,7 @@
 
 ## Features
 
-The AbsSum is equipped with following features:
+The NATS is equipped with following features:
 
 - ```Attention based seq2seq framework.``` 
 Encoder and decoder can be LSTM or GRU. The attention scores can be calculated with three different alignment methods.
