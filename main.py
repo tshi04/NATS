@@ -19,7 +19,7 @@ from data_utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--task', default='train', help='train | validate | rouge | beam')
-parser.add_argument('--data_dir', default='../sum_data/', help='directory that store the data.')
+parser.add_argument('--data_dir', default='../sum_data', help='directory that store the data.')
 parser.add_argument('--file_vocab', default='vocab', help='file store training vocabulary.')
 parser.add_argument('--file_corpus', default='train.txt', help='file store training documents.')
 parser.add_argument('--n_epoch', type=int, default=35, help='number of epochs.')
