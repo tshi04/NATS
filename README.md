@@ -9,7 +9,11 @@
 - Check python2.7 version of NATS from [here](https://github.com/tshi04/textsum/tree/master/tools/codes_python2.7).
 - This repository is a pytorch implementation of seq2seq models for the following [survey](https://arxiv.org/abs/1812.02303):
 
-#### ```Abstractive Text Summarization with Sequence-to-Sequence Models```
+#### Abstractive Text Summarization with Sequence-to-Sequence Models
+[Tian Shi](https://github.com/tshi04), 
+[Yaser Keneshloo](https://github.com/yaserkl), 
+[Naren Ramakrishnan](http://people.cs.vt.edu/naren/), 
+[Chandan K. Reddy](http://people.cs.vt.edu/~reddy/)
 
 
 ## Requirements and Installation
