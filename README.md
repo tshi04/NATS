@@ -31,6 +31,7 @@
 
 ## Dataset
 
+In this survey, we run an extensive set of experiments with NATS on the following datasets. Here, we provide the link to CNN/Daily Mail dataset and data processing codes for Newsroom and Bytecup2018 datasets. 
 - [CNN/Daily Mail](https://github.com/abisee/pointer-generator)
 - [Newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
 - [Bytecup2018](https://github.com/tshi04/NATS/tree/master/tools/bytecup_process)
