@@ -70,6 +70,7 @@ We implemented an efficient beam search algorithm that can also handle cases whe
 This meta-algorithm can be used along with any attention based seq2seq model.
 The OOV words <unk> in summaries are manually replaced with words in source articles using attention weights.
 
+Experimental results can be found in our survey paper.
 
 ## Problems and Todos
 
