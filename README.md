@@ -36,6 +36,8 @@ In this survey, we run an extensive set of experiments with NATS on the followin
 - [Newsroom](https://github.com/tshi04/textsum/tree/master/tools/newsroom_process)
 - [Bytecup2018](https://github.com/tshi04/NATS/tree/master/tools/bytecup_process)
 
+In the dataset, <s> and </s> is used to separate sentences. <sec> is used to separate summaries and articles. We did not use the json format because it takes more space and be difficult to transfer.
+
 ## Usuage
 
 - ```Training:``` python main.py 
