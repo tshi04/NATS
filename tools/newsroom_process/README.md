@@ -28,7 +28,7 @@ We can use different packages to tokenize the texts. If you are using
 
 #### Create data and vocabulary
 
-We will create the dataset which will be used as the input of textsum.
+We will create the dataset which will be used as the input of NATS.
 ```
 python3 process_data_vocab.py
 ```
