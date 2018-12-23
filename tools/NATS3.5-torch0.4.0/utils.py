@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import time
 import sys
+import torch.nn.functional as F
 from torch.autograd import Variable
 '''
 fast beam search
@@ -56,7 +57,7 @@ def fast_beam_search(
             logits, hidden_decoder, h_attn, past_attn, p_gen, attn_, past_dehy = model.forward_onestep_decoder(
                 j, last_wd.view(-1, 1), hidden_decoder_new,
                 h_attn_new, encoder_hy, past_attn_new, past_dehy_new)
-        logits = torch.softmax(logits, dim=2)
+        logits = F.softmax(logits, dim=2)
         if pointer_net:
             if oov_explicit:
                 logits = model.cal_dist_explicit(src_text_rep_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)

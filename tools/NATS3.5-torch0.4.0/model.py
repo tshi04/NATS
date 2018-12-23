@@ -3,6 +3,7 @@
 Please contact tshi@vt.edu
 '''
 import torch
+import torch.nn.functional as F
 from torch.autograd import Variable
 '''
 Bahdanau, D., Cho, K., & Bengio, Y. (2014). 
@@ -56,7 +57,7 @@ class AttentionEncoder(torch.nn.Module):
             attn_agg = self.attn_en_in(enhy) + self.attn_de_in(dehy.unsqueeze(1))
             if self.repetition[:4] == 'asee':
                 attn_agg = attn_agg + self.attn_cv_in(past_attn.unsqueeze(2))
-            attn_agg = torch.tanh(attn_agg)
+            attn_agg = F.tanh(attn_agg)
             attn_ee = self.attn_warp_in(attn_agg).squeeze(2)
         else:
             if self.method == 'luong_general':
@@ -71,7 +72,7 @@ class AttentionEncoder(torch.nn.Module):
             nm = torch.norm(attn, 1, 1).unsqueeze(1)
             attn = attn/nm
         else:
-            attn = torch.softmax(attn_ee, dim=1)
+            attn = F.softmax(attn_ee, dim=1)
         # context vector
         attn2 = attn.unsqueeze(1)
         c_encoder = torch.bmm(attn2, enhy).squeeze(1)
@@ -115,7 +116,7 @@ class AttentionDecoder(torch.nn.Module):
         # attention score
         if self.method == 'luong_concat':
             attn_agg = self.attn_en_in(past_hy) + self.attn_de_in(dehy.unsqueeze(1))
-            attn_agg = torch.tanh(attn_agg)
+            attn_agg = F.tanh(attn_agg)
             attn = self.attn_warp_in(attn_agg).squeeze(2)
         else:
             if self.method == 'luong_general':
@@ -123,7 +124,7 @@ class AttentionDecoder(torch.nn.Module):
                 attn = torch.bmm(past_hy_new, dehy.unsqueeze(2)).squeeze(2)
             else:
                 attn = torch.bmm(past_hy, dehy.unsqueeze(2)).squeeze(2)
-        attn = torch.softmax(attn, dim=1)
+        attn = F.softmax(attn, dim=1)
         # context vector
         attn2 = attn.unsqueeze(1)
         c_decoder = torch.bmm(attn2, past_hy).squeeze(1)
@@ -249,7 +250,7 @@ class LSTMDecoder(torch.nn.Module):
                     pt_input = torch.cat((input_[k], hidden_[0], c_encoder, c_decoder), 1)
                 else:
                     pt_input = torch.cat((input_[k], hidden_[0], c_encoder), 1)
-                p_gen[:, k] = torch.sigmoid(self.pt_out(pt_input).squeeze(1))
+                p_gen[:, k] = F.sigmoid(self.pt_out(pt_input).squeeze(1))
                     
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
@@ -381,7 +382,7 @@ class GRUDecoder(torch.nn.Module):
                     pt_input = torch.cat((input_[k], hidden_, c_encoder, c_decoder), 1)
                 else:
                     pt_input = torch.cat((input_[k], hidden_, c_encoder), 1)
-                p_gen[:, k] = torch.sigmoid(self.pt_out(pt_input).squeeze(1))
+                p_gen[:, k] = F.sigmoid(self.pt_out(pt_input).squeeze(1))
             
         len_seq = input_.size(0)
         batch_size, hidden_size = output_[0].size()
@@ -573,7 +574,7 @@ class Seq2Seq(torch.nn.Module):
                 c_t = src_c_t[-1]
                         
             decoder_h0 = self.encoder2decoder(h_t)
-            decoder_h0 = torch.tanh(decoder_h0)
+            decoder_h0 = F.tanh(decoder_h0)
             if not self.src_hidden_dim*self.src_hidden_dim == self.trg_hidden_dim:
                 decoder_c0 = self.encoder2decoder_c(c_t)
             else:
@@ -595,7 +596,7 @@ class Seq2Seq(torch.nn.Module):
                 h_t = src_h_t[-1]
                         
             decoder_h0 = self.encoder2decoder(h_t)
-            decoder_h0 = torch.tanh(decoder_h0)
+            decoder_h0 = F.tanh(decoder_h0)
             # decoder
             trg_h, _, _, attn_, _, p_gen, _, loss_cv = self.decoder(
                 0, trg_emb,
@@ -658,7 +659,7 @@ class Seq2Seq(torch.nn.Module):
                 c_t = src_c_t[-1]
                         
             decoder_h0 = self.encoder2decoder(h_t)
-            decoder_h0 = torch.tanh(decoder_h0)
+            decoder_h0 = F.tanh(decoder_h0)
             if not self.src_hidden_dim*self.src_hidden_dim == self.trg_hidden_dim:
                 decoder_c0 = self.encoder2decoder_c(c_t)
             else:
@@ -677,7 +678,7 @@ class Seq2Seq(torch.nn.Module):
                 h_t = src_h_t[-1]
                         
             decoder_h0 = self.encoder2decoder(h_t)
-            decoder_h0 = torch.tanh(decoder_h0)
+            decoder_h0 = F.tanh(decoder_h0)
                 
             return encoder_hy, decoder_h0, h_attn, past_attn, past_dehy
     

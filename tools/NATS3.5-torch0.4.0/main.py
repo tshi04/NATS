@@ -10,6 +10,7 @@ import glob
 import time
 
 import torch
+import torch.nn.functional as F
 from torch.autograd import Variable
 
 from model import *
@@ -191,7 +192,7 @@ if args.task == 'train':
                 trg_output_var = trg_output_var.cuda()
             
             logits, attn_, p_gen, loss_cv = model(src_var, trg_input_var)
-            logits = torch.softmax(logits, dim=2)
+            logits = F.softmax(logits, dim=2)
             # use the pointer generator loss
             if args.pointer_net:
                 if args.oov_explicit:
@@ -337,7 +338,7 @@ if args.task == 'validate':
                         trg_output_var = trg_output_var.cuda()
 
                     logits, attn_, p_gen, loss_cv = model(src_var.cuda(), trg_input_var.cuda())
-                    logits = torch.softmax(logits, dim=2)
+                    logits = F.softmax(logits, dim=2)
                     # use the pointer generator loss
                     if args.pointer_net:
                         if args.oov_explicit:
