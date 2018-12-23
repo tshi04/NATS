@@ -22,7 +22,7 @@
 - glob
 - argparse
 - shutil
-- pytorch 0.4.0
+- pytorch 1.0
 
 **Use following scripts to**
 
