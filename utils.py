@@ -58,7 +58,7 @@ def fast_beam_search(
                 h_attn_new, encoder_hy, past_attn_new, past_dehy_new)
         logits = torch.softmax(logits, dim=2)
         if pointer_net:
-            if oov_explicit:
+            if oov_explicit and len(ext_id2oov) > 0:
                 logits = model.cal_dist_explicit(src_text_rep_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
             else:
                 logits = model.cal_dist(src_text_rep, logits, attn_, p_gen, vocab2id)
