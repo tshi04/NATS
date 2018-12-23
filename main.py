@@ -15,6 +15,7 @@ from torch.autograd import Variable
 from model import *
 from utils import *
 from data_utils import *
+from beam_search import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--task', default='train', help='train | validate | rouge | beam')
