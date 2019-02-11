@@ -6,6 +6,8 @@
 [![image](https://img.shields.io/github/issues/Naereen/StrapDown.js.svg)](https://github.com/tshi04/NATS/issues)
 [![image](https://img.shields.io/badge/arXiv-1805.09461-red.svg?style=flat)](https://arxiv.org/abs/1812.02303)
 
+#### Our new implementation is available at https://github.com/tshi04/LeafNATS. Please check it.
+
 - Check python2.7 version of NATS from [here](https://github.com/tshi04/textsum/tree/master/tools/NATS2.7).
 - This repository is a pytorch implementation of seq2seq models for the following survey:
 
