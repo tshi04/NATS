@@ -195,7 +195,7 @@ if args.task == 'train':
             logits = torch.softmax(logits, dim=2)
             # use the pointer generator loss
             if args.pointer_net:
-                if args.oov_explicit:
+                if args.oov_explicit and len(ext_id2oov) > 0:
                     logits = model.cal_dist_explicit(src_var_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
                     logits = logits + 1e-20
                 else:
@@ -341,7 +341,7 @@ if args.task == 'validate':
                     logits = torch.softmax(logits, dim=2)
                     # use the pointer generator loss
                     if args.pointer_net:
-                        if args.oov_explicit:
+                        if args.oov_explicit and len(ext_id2oov) > 0:
                             logits = model.cal_dist_explicit(src_var_ex, logits, attn_, p_gen, vocab2id, ext_id2oov)
                             logits = logits + 1e-20
                         else:
